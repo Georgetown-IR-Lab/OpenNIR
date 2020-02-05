@@ -1,0 +1,8 @@
+ranker=trivial
+vocab=trivial
+trainer=trivial
+trainer.gpu=False
+valid_pred.gpu=False
+test_pred.gpu=False
+pipeline.max_epoch=-1
+pipeline.initial_eval=True

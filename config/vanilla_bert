@@ -1,0 +1,2 @@
+ranker=vanilla_transformer
+./bert

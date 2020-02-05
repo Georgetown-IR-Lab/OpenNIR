@@ -1,0 +1,7 @@
+dataset=antique
+pipeline.val_metric=mrr_rel-3
+ranker.qlen=30
+ranker.dlen=475
+./train
+./valid
+./test

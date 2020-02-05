@@ -1,0 +1,5 @@
+./
+pipeline.rankfn=sdm
+pipeline.params=tw-0.00:1.00:0.05_ow-0.00:1.00:0.05_uw-0.00:1.00:0.05
+pipeline.cond=tw+ow+uw==1
+pipeline.heatmap_ternary=tw,ow,uw

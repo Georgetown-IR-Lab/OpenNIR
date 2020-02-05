@@ -1,0 +1,4 @@
+./
+pipeline.rankfn=bm25_rm3
+pipeline.params=rm3.fbDocs-1:20:1_rm3.fbTerms-1:20:1
+pipeline.heatmap_2d=rm3.fbDocs,rm3.fbTerms

@@ -1,0 +1,4 @@
+./
+pipeline.rankfn=bm25
+pipeline.params=k1-0.1:4.0:0.1_b-0.00:1.00:0.05
+pipeline.heatmap_2d=k1,b

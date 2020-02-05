@@ -1,0 +1,5 @@
+dataset=robust
+train_ds=robust
+valid_ds=robust
+test_ds=robust
+pipeline.val_metric=p@20

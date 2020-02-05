@@ -1,0 +1,6 @@
+valid_ds=antique
+valid_ds.subset=valid
+valid_ds.ranktopk=20
+valid_ds.rankfn=bm25_k1-1.4_b-0.40
+valid_pred.measures=map_rel-3,mrr_rel-3,p_rel-3@1,p_rel-3@3,p_rel-3@10,ndcg_gain-1=0:2=1:3=2:4=3@1,ndcg_gain-1=0:2=1:3=2:4=3@3,ndcg_gain-1=0:2=1:3=2:4=3@10,judged@10
+pipeline.val_metric=mrr_rel-3

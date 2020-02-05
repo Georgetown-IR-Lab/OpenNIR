@@ -1,0 +1,4 @@
+./
+train_ds.subset=trf4
+valid_ds.subset=vaf4
+test_ds.subset=f4

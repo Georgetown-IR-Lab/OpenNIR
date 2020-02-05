@@ -1,0 +1,6 @@
+vocab=bert
+vocab.train=True
+valid_pred.batch_size=16
+test_pred.batch_size=16
+trainer.encoder_lr=2e-5
+trainer.grad_acc_batch=2

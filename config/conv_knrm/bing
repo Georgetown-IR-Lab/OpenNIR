@@ -1,0 +1,5 @@
+./
+ranker.pretrained_kernels=True
+vocab=wordvec_hash
+vocab.source=convknrm
+vocab.variant=convknrm-bing

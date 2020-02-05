@@ -1,0 +1,5 @@
+test_ds=antique
+test_ds.subset=test
+test_ds.rankfn=bm25_k1-1.4_b-0.40
+test_ds.ranktopk=50
+test_pred.measures=map_rel-3,mrr_rel-3,p_rel-3@1,p_rel-3@3,judged@10

@@ -1,0 +1,4 @@
+dataset.collection=1k
+train_ds.collection=1k
+valid_ds.collection=1k
+test_ds.collection=1k

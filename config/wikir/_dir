@@ -1,0 +1,5 @@
+dataset=wikir
+./1k
+./train
+./valid
+./test

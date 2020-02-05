@@ -1,0 +1,3 @@
+test_ds.subset=trec2019
+test_ds.special=msrun
+test_pred.measures=mrr_rel-2@10,ndcg@10,map_rel-2,judged@10,p_rel-2@1

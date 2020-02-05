@@ -1,0 +1,3 @@
+data_dir=~/data/onir/
+modelspace=default
+random_seed=42

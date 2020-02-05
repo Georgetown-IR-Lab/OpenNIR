@@ -1,0 +1,32 @@
+# learning
+torch==1.3.1
+pytorch-pretrained-bert==0.6.1
+pytorch-transformers==1.1.0
+tokenizers==0.1.1
+
+# logging
+tqdm==4.38.0
+colorlog==4.0.2
+terminaltables==3.1.0
+
+# plotting
+matplotlib==3.0.2
+seaborn==0.9.0
+python-ternary==1.0.6
+
+# parsing
+beautifulsoup4==4.4.1
+Unidecode==1.0.22
+nltk==3.4
+
+# interfacing
+git+https://github.com/TREMA-UNH/trec-car-tools.git#subdirectory=python3
+sqlitedict==1.6.0
+pytrec-eval==0.3
+gensim==3.7.3
+Cython==0.29.2
+pyjnius==1.1.4
+
+# misc
+pytools==2018.5.2
+cached-property==1.5.1

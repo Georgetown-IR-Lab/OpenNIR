@@ -1,0 +1,3 @@
+test_ds=wikir
+test_ds.subset=test
+test_pred.measures=p@5,p@10,p@20,ndcg@5,ndcg@10,ndcg@20,ndcg,map

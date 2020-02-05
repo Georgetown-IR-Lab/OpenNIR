@@ -1,0 +1,4 @@
+valid_ds=wikir
+valid_ds.subset=dev
+valid_pred.measures=p@5,p@10,p@20,ndcg@5,ndcg@10,ndcg@20,ndcg,map
+pipeline.val_metric=ndcg

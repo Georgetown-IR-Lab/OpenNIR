@@ -1,0 +1,6 @@
+dataset=msmarco
+pipeline.val_metric=mrr@10
+ranker.qlen=40
+./train
+./minidev
+./judgeddev

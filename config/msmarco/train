@@ -1,0 +1,3 @@
+train_ds=msmarco
+train_ds.subset=train
+train_ds.special=mspairs
