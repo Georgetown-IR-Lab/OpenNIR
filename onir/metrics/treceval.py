@@ -90,11 +90,11 @@ class TrecEvalMetrics(_metrics.BaseMetrics):
                     qrelsf_run = tmpf.name
                 else:
                     qrelsf_run = qrelsf
-                results = {}
                 trec_eval_result = self._treceval(qrelsf_run, runf, rel_args[rel_level, gains].values(), rel_level)
                 for k, v in trec_eval_result.items():
                     full_trec_eval_result[rel_level, gains, k] = v
 
+        results = {}
         for onir_metric, te_metric in output_map.items():
             results[str(onir_metric)] = full_trec_eval_result[te_metric]
 
