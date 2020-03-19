@@ -22,7 +22,7 @@ nltk==3.4.5
 # interfacing
 git+https://github.com/TREMA-UNH/trec-car-tools.git#subdirectory=python3
 sqlitedict==1.6.0
-pytrec-eval==0.3
+git+https://github.com/cvangysel/pytrec_eval.git
 gensim==3.7.3
 Cython==0.29.2
 pyjnius==1.1.4
