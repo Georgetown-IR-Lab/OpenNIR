@@ -7,16 +7,18 @@ import time
 import re
 import shutil
 import threading
+import contextlib
 from functools import lru_cache
 from pytools import memoize_method
 import onir
 from onir.interfaces import trec
 from onir.interfaces.java import J
+from onir import indices
 
 logger = onir.log.easy()
 
 
-J.register(jars=["bin/anserini-0.3.1-SNAPSHOT-fatjar.jar"], defs=dict(
+J.register(jars=["bin/lucene-backward-codecs-8.0.0.jar", "bin/anserini-0.8.0-fatjar.jar"], defs=dict(
     # [L]ucene
     L_FSDirectory='org.apache.lucene.store.FSDirectory',
     L_DirectoryReader='org.apache.lucene.index.DirectoryReader',
@@ -34,32 +36,39 @@ J.register(jars=["bin/anserini-0.3.1-SNAPSHOT-fatjar.jar"], defs=dict(
 
     # [A]nserini
     A_IndexCollection='io.anserini.index.IndexCollection',
-    A_IndexCollection_Args='io.anserini.index.IndexCollection$Args',
+    A_IndexArgs='io.anserini.index.IndexArgs',
     A_IndexUtils='io.anserini.index.IndexUtils',
     A_LuceneDocumentGenerator='io.anserini.index.generator.LuceneDocumentGenerator',
-    A_SearchCollection='io.anserini.search.SearchCollectionBatchOptimized',
+    A_SearchCollection='io.anserini.search.SearchCollection',
     A_SearchArgs='io.anserini.search.SearchArgs',
-    A_EnglishStemmingAnalyzer='io.anserini.analysis.EnglishStemmingAnalyzer',
-    A_AnalyzerUtils='io.anserini.util.AnalyzerUtils',
+    A_DefaultEnglishAnalyzer='io.anserini.analysis.DefaultEnglishAnalyzer',
+    A_AnalyzerUtils='io.anserini.analysis.AnalyzerUtils',
 
     # [M]isc
     M_CmdLineParser='org.kohsuke.args4j.CmdLineParser',
 ))
 
 
+def _surpress_log(java_class, levels=('DEBUG', 'INFO')):
+    re_levels = r'|'.join([re.escape(l) for l in levels])
+    re_java_class = re.escape(java_class)
+    regex = rf'({re_levels}) {re_java_class}'
+    def wrapped(log_line):
+        return re.search(regex, log_line) is None
+    return wrapped
+
+
 def pbar_bq_listener(pbar):
     def wrapped(log_line):
-        match = re.search(r'Run ([0-9]+) topics searched in', log_line)
+        match = re.search(r'INFO io.anserini.search.SearchCollection \[pool-.*-thread-.*\] ([0-9]+) queries processed', log_line)
         if match:
-            pbar.update(int(match.group(1)))
-            return False
-        match = re.search(r'(Ranking with similarity|Reading index at|Use.*query|ReRanking with|Rerank with|percent completed|0\.00 percent completed)', log_line)
-        if match:
+            count = int(match.group(1))
+            pbar.update(count - pbar.n)
             return False
     return wrapped
 
 
-class AnseriniIndex(object):
+class AnseriniIndex(indices.BaseIndex):
     """
     Interface to an Anserini index.
     """
@@ -93,6 +102,9 @@ class AnseriniIndex(object):
         self._load_settings()
         return self._settings['built']
 
+    def num_docs(self):
+        return self._reader().numDocs()
+
     def path(self):
         return self._path
 
@@ -106,28 +118,28 @@ class AnseriniIndex(object):
 
     @memoize_method
     def term2idf(self, term):
-        term = J.A_AnalyzerUtils.tokenize(self._get_stemmed_analyzer(), term).toArray()
+        term = J.A_AnalyzerUtils.analyze(self._get_stemmed_analyzer(), term).toArray()
         if term:
-            df = self._reader().docFreq(J.L_Term(J.A_LuceneDocumentGenerator.FIELD_BODY, term[0]))
+            df = self._reader().docFreq(J.L_Term(J.A_IndexArgs.CONTENTS, term[0]))
             return math.log((self._reader().numDocs() + 1) / (df + 1))
         return 0. # stop word; very common
 
     @memoize_method
     def term2idf_unstemmed(self, term):
-        term = J.A_AnalyzerUtils.tokenize(self._get_analyzer(), term).toArray()
+        term = J.A_AnalyzerUtils.analyze(self._get_analyzer(), term).toArray()
         if len(term) == 1:
-            df = self._reader().docFreq(J.L_Term(J.A_LuceneDocumentGenerator.FIELD_BODY, term[0]))
+            df = self._reader().docFreq(J.L_Term(J.A_IndexArgs.CONTENTS, term[0]))
             return math.log((self._reader().numDocs() + 1) / (df + 1))
         return 0. # stop word; very common
 
     @memoize_method
     def collection_stats(self):
-        return self._searcher().collectionStatistics(J.A_LuceneDocumentGenerator.FIELD_BODY)
+        return self._searcher().collectionStatistics(J.A_IndexArgs.CONTENTS)
 
     def document_vector(self, did):
         result = {}
         ldid = self._get_index_utils().convertDocidToLuceneDocid(did)
-        vec = self._reader().getTermVector(ldid, J.A_LuceneDocumentGenerator.FIELD_BODY)
+        vec = self._reader().getTermVector(ldid, J.A_IndexArgs.CONTENTS)
         it = vec.iterator()
         while it.next():
             result[it.term().utf8ToString()] = it.totalTermFreq()
@@ -154,17 +166,17 @@ class AnseriniIndex(object):
 
     @memoize_method
     def _get_stemmed_analyzer(self):
-        return J.A_EnglishStemmingAnalyzer(self._settings['stemmer'], J.L_CharArraySet(0, False))
+        return J.A_DefaultEnglishAnalyzer.newStemmingInstance(self._settings['stemmer'], J.L_CharArraySet(0, False))
 
     def tokenize(self, text):
-        result = J.A_AnalyzerUtils.tokenize(self._get_analyzer(), text).toArray()
+        result = J.A_AnalyzerUtils.analyze(self._get_analyzer(), text).toArray()
         # mostly good, just gonna split off contractions
         result = list(itertools.chain(*(x.split("'") for x in result)))
         return result
 
     def iter_terms(self):
         field = J.L_MultiFields.getFields(self._reader())
-        it = field.terms(J.A_LuceneDocumentGenerator.FIELD_BODY).iterator()
+        it = field.terms(J.A_IndexArgs.CONTENTS).iterator()
         while it.next():
             yield {
                 'term': it.term().utf8ToString(),
@@ -208,16 +220,16 @@ class AnseriniIndex(object):
         if ldid == -1:
             return -999. * len(query), [-999.] * len(query)
         analyzer = self._get_stemmed_analyzer()
-        query = list(itertools.chain(*[J.A_AnalyzerUtils.tokenize(analyzer, t).toArray() for t in query]))
+        query = list(itertools.chain(*[J.A_AnalyzerUtils.analyze(analyzer, t).toArray() for t in query]))
         if not skip_invividual:
             result = []
             for q in query:
                 q = _anserini_escape(q, J)
-                lquery = J.L_QueryParser().parse(q, J.A_LuceneDocumentGenerator.FIELD_BODY)
+                lquery = J.L_QueryParser().parse(q, J.A_IndexArgs.CONTENTS)
                 explain = self._searcher().explain(lquery, ldid)
-                result.append(explain.getValue())
+                result.append(explain.getValue().doubleValue())
             return sum(result), result
-        lquery = J.L_QueryParser().parse(_anserini_escape(' '.join(query), J), J.A_LuceneDocumentGenerator.FIELD_BODY)
+        lquery = J.L_QueryParser().parse(_anserini_escape(' '.join(query), J), J.A_IndexArgs.CONTENTS)
         explain = self._searcher().explain(lquery, ldid)
         return explain.getValue()
 
@@ -226,10 +238,10 @@ class AnseriniIndex(object):
         self._searcher().setSimilarity(sim)
         ldids = {self._get_index_utils().convertDocidToLuceneDocid(did): did for did in dids}
         analyzer = self._get_stemmed_analyzer()
-        query = J.A_AnalyzerUtils.tokenize(analyzer, query).toArray()
+        query = J.A_AnalyzerUtils.analyze(analyzer, query).toArray()
         query = ' '.join(_anserini_escape(q, J) for q in query)
-        docs = ' '.join(f'{J.A_LuceneDocumentGenerator.FIELD_ID}:{did}' for did in dids)
-        lquery = J.L_QueryParser().parse(f'({query}) AND ({docs})', J.A_LuceneDocumentGenerator.FIELD_BODY)
+        docs = ' '.join(f'{J.A_IndexArgs.ID}:{did}' for did in dids)
+        lquery = J.L_QueryParser().parse(f'({query}) AND ({docs})', J.A_IndexArgs.CONTENTS)
         result = {}
         search_results = self._searcher().search(lquery, len(dids))
         for top_doc in search_results.scoreDocs:
@@ -239,7 +251,7 @@ class AnseriniIndex(object):
 
 
     def build(self, doc_iter, replace=False, optimize=True, store_term_weights=False):
-        with logger.duration(f'building {self._path}'):
+        with logger.duration(f'building {self._path}'), J.listen_java_log(_surpress_log('io.anserini.index.IndexCollection')):
             thread_count = onir.util.safe_thread_count()
             with tempfile.TemporaryDirectory() as d:
                 if self._settings['built']:
@@ -253,7 +265,7 @@ class AnseriniIndex(object):
                     fifo = os.path.join(d, f'{t}.json')
                     os.mkfifo(fifo)
                     fifos.append(fifo)
-                index_args = J.A_IndexCollection_Args()
+                index_args = J.A_IndexArgs()
                 index_args.collectionClass = 'JsonCollection'
                 index_args.generatorClass = 'LuceneDocumentGenerator'
                 index_args.threads = thread_count
@@ -296,7 +308,7 @@ class AnseriniIndex(object):
                 else:
                     logger.warn(f'adding to existing index: {self._path}')
             thread_count = onir.util.safe_thread_count()
-            index_args = J.A_IndexCollection_Args()
+            index_args = J.A_IndexArgs()
             index_args.collectionClass = 'TrecCollection'
             index_args.generatorClass = 'JsoupGenerator'
             index_args.threads = thread_count
@@ -355,7 +367,7 @@ class AnseriniIndex(object):
                 '-index', self._path,
                 '-topics', *topic_files,
                 '-output', run_f,
-                '-topicreader', 'Basic',
+                '-topicreader', 'TsvString',
                 '-threads', str(THREADS),
                 '-hits', str(topk)
             ]
@@ -368,10 +380,10 @@ class AnseriniIndex(object):
                     elif len(arg) == 2:
                         k, v = arg
                     if k == 'k1':
-                        arg_args.append('-k1')
+                        arg_args.append('-bm25.k1')
                         arg_args.append(v)
                     elif k == 'b':
-                        arg_args.append('-b')
+                        arg_args.append('-bm25.b')
                         arg_args.append(v)
                     elif k == 'rm3':
                         arg_args.append('-rm3')
@@ -384,7 +396,7 @@ class AnseriniIndex(object):
                     else:
                         raise ValueError(f'unknown bm25 parameter {arg}')
             elif model.startswith('ql'):
-                arg_args.append('-ql')
+                arg_args.append('-qld')
                 model_args = [arg.split('-', 1) for arg in model.split('_')[1:]]
                 for arg in model_args:
                     if len(arg) == 1:
@@ -392,13 +404,13 @@ class AnseriniIndex(object):
                     elif len(arg) == 2:
                         k, v = arg
                     if k == 'mu':
-                        arg_args.append('-mu')
+                        arg_args.append('-qld.mu')
                         arg_args.append(v)
                     else:
                         raise ValueError(f'unknown ql parameter {arg}')
             elif model.startswith('sdm'):
                 arg_args.append('-sdm')
-                arg_args.append('-ql')
+                arg_args.append('-qld')
                 model_args = [arg.split('-', 1) for arg in model.split('_')[1:]]
                 for arg in model_args:
                     if len(arg) == 1:
@@ -406,7 +418,7 @@ class AnseriniIndex(object):
                     elif len(arg) == 2:
                         k, v = arg
                     if k == 'mu':
-                        arg_args.append('-mu')
+                        arg_args.append('-qld.mu')
                         arg_args.append(v)
                     elif k == 'tw':
                         arg_args.append('-sdm.tw')
@@ -422,13 +434,11 @@ class AnseriniIndex(object):
             else:
                 raise ValueError(f'unknown model {model}')
             parser.parseArgument(*arg_args)
-            if not quiet:
-                with logger.pbar_raw(desc=f'batch_query ({model})', total=total_topics) as pbar:
-                    with J.listen_java_log(pbar_bq_listener(pbar)):
-                        searcher = J.A_SearchCollection(args)
-                        searcher.runTopics()
-                        searcher.close()
-            else:
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(J.listen_java_log(_surpress_log('io.anserini.search.SearchCollection')))
+                if not quiet:
+                    pbar = stack.enter_context(logger.pbar_raw(desc=f'batch_query ({model})', total=total_topics))
+                    stack.enter_context(J.listen_java_log(pbar_bq_listener(pbar)))
                 searcher = J.A_SearchCollection(args)
                 searcher.runTopics()
                 searcher.close()
@@ -437,22 +447,10 @@ class AnseriniIndex(object):
             else:
                 return trec.read_run_dict(run_f)
 
+
 def _anserini_escape(text, J):
     text = J.L_QueryParserUtil.escape(text)
     text = text.replace('<', '\\<')
     text = text.replace('>', '\\>')
     text = text.replace('=', '\\=')
     return text
-
-
-def main():
-    idx = AnseriniIndex('/home/sean/data/onir/datasets/msmarco/anserini.porter')
-    queries = [('0', 'bank hours')]
-    # idx.batch_query(queries, 'bm25', topk=1000, destf='/home/sean/tmp/out8.run')
-    # idx.get_query_doc_scores(['bank', 'hour'], '7325503', 'bm25', True)
-    # idx.get_query_doc_scores(['bank', 'hour'], '7384109', 'bm25', True)
-    idx.get_query_doc_scores(['bank', 'hour'], '1948771', 'bm25', True)
-
-
-if __name__ == '__main__':
-    main()
