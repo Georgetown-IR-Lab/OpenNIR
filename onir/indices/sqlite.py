@@ -1,6 +1,7 @@
 import os
 import onir
 from onir.interfaces.sqlite import Sqlite2KeyDict
+from onir import indices
 
 
 FIELD_RAW = '__raw__'
@@ -9,7 +10,7 @@ FIELD_RAW = '__raw__'
 _logger = onir.log.easy()
 
 
-class SqliteDocstore:
+class SqliteDocstore(indices.BaseIndex):
     def __init__(self, path, field='text'):
         self._path = path
         self._field = field
