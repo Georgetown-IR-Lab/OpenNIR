@@ -72,7 +72,7 @@ class AnseriniIndex(indices.BaseIndex):
     """
     Interface to an Anserini index.
     """
-    def __init__(self, path, keep_stops=False, stemmer='porter', field='text'):
+    def __init__(self, path, keep_stops=False, stemmer='porter', field='text', store_raw_docs=False):
         self._path = path
         os.makedirs(path, exist_ok=True)
         self._settings_path = os.path.join(path, 'settings.json')
@@ -81,12 +81,14 @@ class AnseriniIndex(indices.BaseIndex):
             assert self._settings['keep_stops'] == keep_stops
             assert self._settings['stemmer'] == stemmer
             assert self._settings['field'] == field
+            assert self._settings['store_raw_docs'] == store_raw_docs
         else:
             self._settings = {
                 'keep_stops': keep_stops,
                 'stemmer': stemmer,
                 'field': field,
-                'built': False
+                'built': False,
+                'store_raw_docs': store_raw_docs
             }
             self._dump_settings()
 
@@ -97,6 +99,8 @@ class AnseriniIndex(indices.BaseIndex):
     def _load_settings(self):
         with open(self._settings_path, 'rt') as f:
             self._settings = json.load(f)
+            if 'store_raw_docs' not in self._settings:
+                self._settings['store_raw_docs'] = False
 
     def built(self):
         self._load_settings()
@@ -104,6 +108,14 @@ class AnseriniIndex(indices.BaseIndex):
 
     def num_docs(self):
         return self._reader().numDocs()
+
+    def docids(self):
+        index_utils = self._get_index_utils()
+        for i in range(self.num_docs()):
+            yield index_utils.convertLuceneDocidToDocid(i)
+
+    def get_raw(self, did):
+        return self._get_index_utils().getRawDocument(did)
 
     def path(self):
         return self._path
@@ -273,6 +285,7 @@ class AnseriniIndex(indices.BaseIndex):
                 index_args.index = self._path
                 index_args.storePositions = True
                 index_args.storeDocvectors = True
+                index_args.storeRawDocs = self._settings['store_raw_docs']
                 index_args.storeTermWeights = store_term_weights
                 index_args.keepStopwords = self._settings['keep_stops']
                 index_args.stemmer = self._settings['stemmer']

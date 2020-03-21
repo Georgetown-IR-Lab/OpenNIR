@@ -12,15 +12,19 @@ class TestMetrics(unittest.TestCase):
         docs = [indices.RawDoc(did, dtext) for t, did, dtext in df if t == 'doc']
         with tempfile.TemporaryDirectory() as tmpdir:
             idxs = [
-                indices.AnseriniIndex(os.path.join(tmpdir, 'anserini')),
-                indices.SqliteDocstore(os.path.join(tmpdir, 'sqlite')),
+                (indices.AnseriniIndex(os.path.join(tmpdir, 'anserini')), False),
+                (indices.AnseriniIndex(os.path.join(tmpdir, 'anserini.rawdocs'), store_raw_docs=True), True),
+                (indices.SqliteDocstore(os.path.join(tmpdir, 'sqlite')), True),
             ]
-            for index in idxs:
+            for index, check_raw_docs in idxs:
                 with self.subTest(index=index):
                     self.assertFalse(index.built())
                     index.build(iter(docs))
                     self.assertTrue(index.built())
                     self.assertEqual(index.num_docs(), len(docs))
+                    if check_raw_docs:
+                        for doc in docs:
+                            self.assertEqual(index.get_raw(doc.did), doc.data['text'])
 
     def test_batch_query(self):
         df = list(plaintext.read_tsv('etc/dummy_datafile.tsv'))
