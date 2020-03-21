@@ -22,9 +22,9 @@ FOLDS['all'] = _ALL
 
 
 _FILES = {
-    'index': dict(url='https://git.uwaterloo.ca/jimmylin/anserini-indexes/raw/master/index-robust04-20191213.tar.gz', expected_sha256="dddb81f16d70ea6b9b0f94d6d6b888ed2ef827109a14ca21fd82b2acd6cbd450"),
-    'queries': dict(url='https://trec.nist.gov/data/robust/04.testset.gz', expected_sha256="df769c0b455970168a4dd0dfb36f0d809d102d1bfcda566511e980c2355ce77f"),
-    'qrels': dict(url='https://trec.nist.gov/data/robust/qrels.robust2004.txt', expected_sha256="f8f2c972d3c710d85daa7ead02daf4ffe2bbe3647c9f3904500182f43ddbf4c3"),
+    'index': dict(url='https://git.uwaterloo.ca/jimmylin/anserini-indexes/raw/master/index-robust04-20191213.tar.gz', expected_md5="15f3d001489c97849a010b0a4734d018"),
+    'queries': dict(url='https://trec.nist.gov/data/robust/04.testset.gz', expected_md5="5eac3d774a2f87da61c08a94f945beff"),
+    'qrels': dict(url='https://trec.nist.gov/data/robust/qrels.robust2004.txt', expected_md5="123c2a0ba2ec31178cb1050995dcfdfa"),
 }
 
 
@@ -105,7 +105,8 @@ https://trec.nist.gov/data/cd45/index.html"""
         query_file = os.path.join(base_path, 'topics.txt')
         if (force or not os.path.exists(query_file)) and self._confirm_dua():
             query_file_stream = util.download_stream(**_FILES['queries'], encoding='utf8')
-            plaintext.write_tsv(query_file, trec.parse_query_format(query_file_stream))
+            with util.finialized_file(query_file) as f:
+                plaintext.write_tsv(f, trec.parse_query_format(query_file_stream))
 
     def _init_iter_collection(self):
         # Using the trick here from capreolus, pulling document content out of public index:
