@@ -105,7 +105,7 @@ https://trec.nist.gov/data/cd45/index.html"""
         query_file = os.path.join(base_path, 'topics.txt')
         if (force or not os.path.exists(query_file)) and self._confirm_dua():
             query_file_stream = util.download_stream(**_FILES['queries'], encoding='utf8')
-            with util.finialized_file(query_file) as f:
+            with util.finialized_file(query_file, 'wt') as f:
                 plaintext.write_tsv(f, trec.parse_query_format(query_file_stream))
 
     def _init_iter_collection(self):
