@@ -1,0 +1,4 @@
+./
+test_ds=trec_spanish
+test_ds.subset=trec4
+test_ds.querysource=desc

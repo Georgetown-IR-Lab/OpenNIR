@@ -1,0 +1,3 @@
+./
+test_ds=trec_arabic
+test_ds.subset=2001
