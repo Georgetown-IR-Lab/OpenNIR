@@ -21,6 +21,13 @@ for i in range(len(FOLDS)):
 FOLDS['all'] = _ALL
 
 
+_FILES = {
+    'index': dict(url='https://git.uwaterloo.ca/jimmylin/anserini-indexes/raw/master/index-robust04-20191213.tar.gz', expected_md5="15f3d001489c97849a010b0a4734d018"),
+    'queries': dict(url='https://trec.nist.gov/data/robust/04.testset.gz', expected_md5="5eac3d774a2f87da61c08a94f945beff"),
+    'qrels': dict(url='https://trec.nist.gov/data/robust/qrels.robust2004.txt', expected_md5="123c2a0ba2ec31178cb1050995dcfdfa"),
+}
+
+
 @datasets.register('robust')
 class RobustDataset(datasets.IndexBackedDataset):
     """
@@ -28,8 +35,6 @@ class RobustDataset(datasets.IndexBackedDataset):
      > Ellen M. Voorhees. 2004. Overview of TREC 2004. In TREC.
     """
     DUA = """Will begin downloading Robust04 dataset.
-For documents, copy or link trec disks 4 and 5 (trec45nocr) to
-{ds_path}/trec45nocr
 Please confirm you agree to the authors' data usage stipulations found at
 https://trec.nist.gov/data/cd45/index.html"""
 
@@ -88,7 +93,7 @@ https://trec.nist.gov/data/cd45/index.html"""
 
         qrels_file = os.path.join(base_path, 'qrels.robust2004.txt')
         if (force or not os.path.exists(qrels_file)) and self._confirm_dua():
-            util.download('https://trec.nist.gov/data/robust/qrels.robust2004.txt', qrels_file)
+            util.download(**_FILES['qrels'], file_name=qrels_file)
 
         for fold in FOLDS:
             fold_qrels_file = os.path.join(base_path, f'{fold}.qrels')
@@ -99,10 +104,17 @@ https://trec.nist.gov/data/cd45/index.html"""
 
         query_file = os.path.join(base_path, 'topics.txt')
         if (force or not os.path.exists(query_file)) and self._confirm_dua():
-            raw_url = 'https://trec.nist.gov/data/robust/04.testset.gz'
-            query_file_stream = util.download_stream(raw_url, encoding='utf8')
-            plaintext.write_tsv(query_file, trec.parse_query_format(query_file_stream))
+            query_file_stream = util.download_stream(**_FILES['queries'], encoding='utf8')
+            with util.finialized_file(query_file, 'wt') as f:
+                plaintext.write_tsv(f, trec.parse_query_format(query_file_stream))
 
     def _init_iter_collection(self):
-        doc_dir = os.path.join(util.path_dataset(self), 'trec45nocr')
-        yield from self.logger.pbar(trec.parse_doc_format(doc_dir), desc='documents')
+        # Using the trick here from capreolus, pulling document content out of public index:
+        # <https://github.com/capreolus-ir/capreolus/blob/d6ae210b24c32ff817f615370a9af37b06d2da89/capreolus/collection/robust04.yaml#L15>
+        with util.download_tmp(**_FILES['index']) as f:
+            fd = f'{f.name}.d'
+            util.extract_tarball(f.name, fd, self.logger, reset_permissions=True)
+            index = indices.AnseriniIndex(f'{fd}/index-robust04-20191213')
+            for did in self.logger.pbar(index.docids(), desc='documents'):
+                raw_doc = index.get_raw(did)
+                yield indices.RawDoc(did, raw_doc)

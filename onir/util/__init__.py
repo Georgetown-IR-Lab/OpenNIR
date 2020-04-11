@@ -138,27 +138,16 @@ class TqdmFile(io.BufferedReader):
         if 'message' in kwargs:
             message = kwargs['message']
             del kwargs['message']
-        self.total = os.path.getsize(path)
-        self.count = 0
-        self.pbar = tqdm(desc=message, total=self.total, unit='B', unit_scale=True, ncols=80)
+        self.pbar = tqdm(desc=message, unit='B', unit_scale=True, ncols=80)
         io.BufferedReader.__init__(self, io.FileIO(path, *args, **kwargs))
 
     def read(self, size):
         result = io.BufferedReader.read(self, size)
         self.pbar.update(len(result))
-        self.count += len(result)
         return result
 
     def seek(self, offset, whence=0):
-        if whence == 0: # SEEK_SET
-            self.count = offset
-        elif whence == 1: # SEEK_CUR
-            self.count += offset
-        elif whence == 2: # SEEK_END
-            self.count = self.total - offset
-        self.pbar.reset(self.count)
         io.BufferedReader.seek(self, offset, whence)
-
 
     def close(self, *args, **kwargs):
         self.pbar.close()

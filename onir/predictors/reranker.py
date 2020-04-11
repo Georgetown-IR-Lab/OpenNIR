@@ -17,6 +17,7 @@ class Reranker(predictors.BasePredictor):
             'gpu': True,
             'gpu_determ': True,
             'preload': False,
+            'run_threshold': 0,
             'measures': 'map,ndcg,p@20,ndcg@20,mrr',
             'source': 'run'
         }
@@ -36,6 +37,7 @@ class Reranker(predictors.BasePredictor):
         it = datasets.record_iter(self.dataset,
                                   fields=fields,
                                   source=self.config['source'],
+                                  run_threshold=self.config['run_threshold'],
                                   minrel=None,
                                   shuf=False,
                                   random=self.random,
@@ -90,7 +92,10 @@ class Reranker(predictors.BasePredictor):
             if isinstance(ds, list):
                 total = sum(len(d['query_id']) for d in ds)
             elif self.config['source'] == 'run':
-                total = sum(len(v) for v in self.dataset.run().values())
+                if self.config['run_threshold'] > 0:
+                    total = sum(min(len(v), self.config['run_threshold']) for v in self.dataset.run().values())
+                else:
+                    total = sum(len(v) for v in self.dataset.run().values())
             elif self.config['source'] == 'qrels':
                 total = sum(len(v) for v in self.dataset.qrels().values())
             with self.logger.pbar_raw(total=total, desc='pred', quiet=True) as pbar:
@@ -115,6 +120,8 @@ class PredictorContext:
         cached = True
         epoch = ctxt['epoch']
         base_path = os.path.join(ctxt['base_path'], self.pred.dataset.path_segment())
+        if self.pred.config['source'] == 'run' and self.pred.config['run_threshold'] > 0:
+            base_path = '{p}_runthreshold-{run_threshold}'.format(p=base_path, **self.pred.config)
         os.makedirs(os.path.join(base_path, 'runs'), exist_ok=True)
         with open(os.path.join(base_path, 'config.json'), 'wt') as f:
             json.dump(self.pred.dataset.config, f)
@@ -122,6 +129,10 @@ class PredictorContext:
         if os.path.exists(run_path):
             run = trec.read_run_dict(run_path)
         else:
+            if self.pred.config['source'] == 'run' and self.pred.config['run_threshold'] > 0:
+                official_run = self.pred.dataset.run('dict')
+            else:
+                official_run = {}
             run = {}
             ranker = ctxt['ranker']().to(self.device)
             this_qid = None
@@ -130,11 +141,13 @@ class PredictorContext:
                 for qid, did, score in self.pred.iter_scores(ranker, self.datasource, self.device):
                     if qid != this_qid:
                         if this_qid is not None:
+                            these_docs = self._apply_threshold(these_docs, official_run.get(this_qid, {}))
                             trec.write_run_dict(f, {this_qid: these_docs})
                         this_qid = qid
                         these_docs = {}
                     these_docs[did] = score
                 if this_qid is not None:
+                    these_docs = self._apply_threshold(these_docs, official_run.get(this_qid, {}))
                     trec.write_run_dict(f, {this_qid: these_docs})
             cached = False
 
@@ -193,3 +206,10 @@ class PredictorContext:
             with open(path_agg, 'at') as f:
                 plaintext.write_tsv(f, [(str(epoch), str(ctxt['metrics'][metric]))])
             plaintext.write_tsv(path_epoch, ctxt['metrics_by_query'][metric].items())
+
+    def _apply_threshold(self, these_docs, original_scores):
+        min_score = min(these_docs.values())
+        missing_docs = original_scores.keys() - these_docs.keys()
+        for i, did in enumerate(sorted(missing_docs, key=lambda did: original_scores[did], reverse=True)):
+            these_docs[did] = min_score - i - 1
+        return these_docs
