@@ -4,6 +4,11 @@ from onir import util, datasets, indices
 
 @datasets.register('trec_mandarin')
 class TrecMandarinDataset(datasets.MultilingualDataset):
+    """
+    Interface to the TREC Mandarin datasets. Used for cross-lingual experiments in:
+     > Sean MacAvaney, Luca Soldaini, Nazli Goharian. Teaching a New Dog Old Tricks: Resurrecting
+     > Multilingual Retrieval Using Zero-shot Learning. In ECIR 2020.
+    """
     DUA = """Will begin downloading TREC Mandarin dataset.
 You first need a copy of LDC2000T52, which can be found at:
 https://catalog.ldc.upenn.edu/LDC2000T52

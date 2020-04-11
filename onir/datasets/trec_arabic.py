@@ -4,6 +4,11 @@ from onir import util, datasets, indices
 
 @datasets.register('trec_arabic')
 class TrecArabicDataset(datasets.MultilingualDataset):
+    """
+    Interface to the TREC Arabic datasets. Used for cross-lingual experiments in:
+     > Sean MacAvaney, Luca Soldaini, Nazli Goharian. Teaching a New Dog Old Tricks: Resurrecting
+     > Multilingual Retrieval Using Zero-shot Learning. In ECIR 2020.
+    """
     DUA = """Will begin downloading TREC Arabic dataset.
 You first need a copy of LDC2001T55, which can be found at:
 https://catalog.ldc.upenn.edu/LDC2001T55

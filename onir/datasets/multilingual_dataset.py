@@ -6,6 +6,11 @@ from onir.interfaces import trec, plaintext
 
 
 class MultilingualDataset(datasets.IndexBackedDataset):
+    """
+    Abstract class used for cross-lingual experiments in:
+     > Sean MacAvaney, Luca Soldaini, Nazli Goharian. Teaching a New Dog Old Tricks: Resurrecting
+     > Multilingual Retrieval Using Zero-shot Learning. In ECIR 2020.
+    """
 
     @staticmethod
     def default_config():
