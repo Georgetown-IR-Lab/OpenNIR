@@ -1,0 +1,11 @@
+valid_pred.measures=map,ndcg@20,p@20
+test_pred.measures=map,ndcg@20,p@20
+pipeline.val_metric=ndcg@20
+trainer.grad_acc_batch=1
+ranker.qlen=90
+ranker.dlen=1500
+vocab=bert
+vocab.bert_base=bert-base-multilingual-cased
+test_pred.run_threshold=100
+pipeline.test=True
+../robust/fold1

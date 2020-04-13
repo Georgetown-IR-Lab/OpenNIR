@@ -52,6 +52,7 @@ $ bash scripts/pipeline.sh config/antique config/vanilla_bert
  - [Metrics](metrics.html)
  - [Datasets](datasets.html)
  - [Vocabularies](vocab.html)
+ - [Multi-lingual experiments](multilingual.html)
 
 
 ### Citing OpenNIR

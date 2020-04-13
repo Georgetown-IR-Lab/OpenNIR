@@ -53,6 +53,7 @@ the `ONIR_ARGS` environment variable.
  - ANTIQUE `config/antique`
  - TREC CAR `config/car`
  - New York Times `config/nyt` -- for [content-based weak supervision](https://arxiv.org/abs/1707.00189)
+ - TREC Arabic, Mandarin, and Spanish `config/multiling/*` -- for [zero-shot multilingual transfer learning](https://arxiv.org/pdf/1912.13080.pdf) ([instructions](https://opennir.net/multilingual.html))
 
 ### Evaluation Metrics
 

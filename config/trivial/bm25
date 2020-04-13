@@ -1,0 +1,3 @@
+./
+valid_ds.rankfn=bm25
+test_ds.rankfn=bm25
