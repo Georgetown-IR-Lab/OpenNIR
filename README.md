@@ -3,6 +3,8 @@ An end-to-end neural ad-hoc ranking pipeline.
 
 ## Quick start
 
+*OpenNIR requires Python 3.6* (not tested with other versions).
+
 Install dependencies
 
 ```bash
