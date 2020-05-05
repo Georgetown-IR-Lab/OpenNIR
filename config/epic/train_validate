@@ -1,0 +1,10 @@
+../msmarco/
+../msmarco/judgeddev
+.
+
+trainer.grad_acc_batch=1
+trainer.lr=2e-5
+train_ds.ranktopk=1000
+
+valid_pred.batch_size=4
+valid_ds.ranktopk=20

@@ -23,6 +23,8 @@ class BasePipeline:
         if self.config.get('gpu'):
             self.logger.info('moving model to GPU')
             ranker.cuda()
+        else:
+            ranker.cpu()
 
     def _load_ranker_weights_file_path(self, ranker, path):
         ranker.load(path)

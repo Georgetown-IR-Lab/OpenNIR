@@ -42,6 +42,7 @@ J.register(jars=["bin/lucene-backward-codecs-8.0.0.jar", "bin/anserini-0.8.0-fat
     A_SearchCollection='io.anserini.search.SearchCollection',
     A_SearchArgs='io.anserini.search.SearchArgs',
     A_DefaultEnglishAnalyzer='io.anserini.analysis.DefaultEnglishAnalyzer',
+    A_SimpleSearcher='io.anserini.search.SimpleSearcher',
     A_AnalyzerUtils='io.anserini.analysis.AnalyzerUtils',
 
     # [M]isc
@@ -446,6 +447,36 @@ class AnseriniIndex(indices.BaseIndex):
                 shutil.copy(run_f, destf)
             else:
                 return trec.read_run_dict(run_f)
+
+    @memoize_method
+    def simple_searcher(self, model):
+        result = J.A_SimpleSearcher(self._path)
+        if model.startswith('bm25'):
+            k1, b = 0.9, 0.4
+            model_args = [arg.split('-', 1) for arg in model.split('_')[1:]]
+            for arg in model_args:
+                if len(arg) == 1:
+                    k, v = arg[0], None
+                elif len(arg) == 2:
+                    k, v = arg
+                if k == 'k1':
+                    k1 = v
+                elif k == 'b':
+                    b = v
+                else:
+                    raise ValueError(f'unknown bm25 parameter {arg}')
+            result.setBM25Similarity(k1, b)
+        else:
+            raise ValueError(f'unsupported model {model}')
+        return result
+
+    def query_simplesearcher(self, query, model, topk):
+        searcher = self.simple_searcher(model)
+        result = {}
+        for record in searcher.search(query, topk):
+            result[record.docid] = record.score
+        return result
+
 
 
 def _anserini_escape(text, J):

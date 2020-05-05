@@ -14,12 +14,12 @@ def nil_handler(_):
     return terms, weights
 
 
-def zip_handler(url, ext=''):
+def zip_handler(url, ext='', expected_md5=None):
     def wrapped(logger):
         with tempfile.TemporaryDirectory() as p:
             path = os.path.join(p, 'download')
             with logger.duration(f'downloading {url}'):
-                util.download(url, path)
+                util.download(url, path, expected_md5=expected_md5)
             with logger.duration('extracting vecs'):
                 with zipfile.ZipFile(path) as z:
                     zip_file_name = url.split('/')[-1][:-4] + ext
