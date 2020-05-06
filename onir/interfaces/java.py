@@ -42,12 +42,12 @@ class _JavaInterface:
 
     def __getattr__(self, key):
         if self._autoclass is None:
-            self.initizlize()
+            self.initialize()
         if key not in self._cache:
             self._cache[key] = self._autoclass(self._defs[key])
         return self._cache[key]
 
-    def initizlize(self):
+    def initialize(self):
         if self._autoclass is not None:
             logger.debug('jnius already initialized')
             return
