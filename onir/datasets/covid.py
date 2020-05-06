@@ -33,7 +33,7 @@ https://ir.nist.gov/covidSubmit/"""
         result = datasets.IndexBackedDataset.default_config()
         result.update({
             # subset of queries to use
-            'subset': onir.config.Choices(['rnd1-query', 'rnd1-quest', 'rnd1-narr', 'rnd2-query', 'rnd2-quest', 'rnd2-narr']),
+            'subset': onir.config.Choices(['rnd1-query', 'rnd1-quest', 'rnd1-narr', 'rnd1-udel', 'rnd2-query', 'rnd2-quest', 'rnd2-narr', 'rnd2-udel']),
             # date of CORD-19 dump to use
             'date': onir.config.Choices(['2020-04-10']),
             '2020_filter': False, # filter documents to only 2020?
@@ -133,6 +133,17 @@ https://ir.nist.gov/covidSubmit/"""
                         (qid, 'narr', topic.find('narrative').get_text()),
                     ])
 
+        udel_flag = path + '.includes_udel'
+        if not os.path.exists(udel_flag):
+            with open(path, 'at') as fout, util.finialized_file(udel_flag, 'wt'):
+                 with util.download_tmp('https://raw.githubusercontent.com/castorini/anserini/master/src/main/resources/topics-and-qrels/topics.covid-round1-udel.xml', expected_md5="2915cf59ae222f0aa20b2a671f67fd7a") as f:
+                    soup = BeautifulSoup(f.read(), 'lxml-xml')
+                    for topic in soup.find_all('topic'):
+                        qid = topic['number']
+                        plaintext.write_tsv(fout, [
+                            (qid, 'udel', topic.find('query').get_text()),
+                        ])
+
         path = os.path.join(util.path_dataset(self), 'rnd2.tsv')
         if not os.path.exists(path) and self._confirm_dua():
             with util.download_tmp('https://ir.nist.gov/covidSubmit/data/topics-rnd2.xml', expected_md5="550129e71c83de3fb4d6d29a172c5842") as f, \
@@ -145,6 +156,17 @@ https://ir.nist.gov/covidSubmit/"""
                         (qid, 'quest', topic.find('question').get_text()),
                         (qid, 'narr', topic.find('narrative').get_text()),
                     ])
+
+        udel_flag = path + '.includes_udel'
+        if not os.path.exists(udel_flag):
+            with open(path, 'at') as fout, util.finialized_file(udel_flag, 'wt'):
+                 with util.download_tmp('https://raw.githubusercontent.com/castorini/anserini/master/src/main/resources/topics-and-qrels/topics.covid-round2-udel.xml', expected_md5="a8988734e6f812921d5125249c197985") as f:
+                    soup = BeautifulSoup(f.read(), 'lxml-xml')
+                    for topic in soup.find_all('topic'):
+                        qid = topic['number']
+                        plaintext.write_tsv(fout, [
+                            (qid, 'udel', topic.find('query').get_text()),
+                        ])
 
         path = os.path.join(util.path_dataset(self), 'rnd1.qrels')
         if not os.path.exists(path) and self._confirm_dua():
