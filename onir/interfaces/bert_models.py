@@ -12,16 +12,17 @@ def _hugging_handler(name, base_path, logger):
     return name
 
 
-def _scibert_handler(url_seg):
+def _scibert_handler(url_seg, expected_md5=None):
     url = f'https://s3-us-west-2.amazonaws.com/ai2-s2-research/scibert/{url_seg}'
     def wrapped(name, base_path, logger):
         path = os.path.join(base_path, name)
         if not os.path.exists(path):
-            _download_tarball(url, path, logger)
+            _download_tarball(url, path, logger, expected_md5=expected_md5)
 
             weights_tarball = os.path.join(path, 'weights.tar.gz')
             util.extract_tarball(weights_tarball, path, logger, reset_permissions=True)
             os.remove(weights_tarball)
+            os.rename(os.path.join(path, 'bert_config.json'), os.path.join(path, 'config.json'))
         return path
     return wrapped
 
@@ -48,8 +49,8 @@ def _biobert_handler(url_seg):
 
 # locations of pre-trained BERT configurations
 MODEL_MAP = {
-    'scibert-scivocab-uncased':_scibert_handler('pytorch_models/scibert_scivocab_uncased.tar'),
-    'scibert-scivocab-cased':_scibert_handler('pytorch_models/scibert_scivocab_cased.tar.gz'),
+    'scibert-scivocab-uncased':_scibert_handler('pytorch_models/scibert_scivocab_uncased.tar', expected_md5="79d8bd0f5b575a60c72178d6037fe095"),
+    'scibert-scivocab-cased':_scibert_handler('pytorch_models/scibert_scivocab_cased.tar', expected_md5="520fa09fa8504ebca15f827c4b99ec51"),
     'scibert-basevocab-uncased':_scibert_handler('pytorch_models/scibert_basevocab_uncased.tar.gz'),
     'scibert-basevocab-cased':_scibert_handler('pytorch_models/scibert_basevocab_cased.tar.gz'),
     'biobert-pubmed-pmc':_biobert_handler('v1.0-pubmed-pmc/biobert_pubmed_pmc.tar.gz'),
@@ -75,8 +76,8 @@ def get_model(name, logger):
     return MODEL_MAP[name](name, base_path, logger)
 
 
-def _download_tarball(url, path, logger):
-    util.download_if_needed(url, path + '.tar.gz')
+def _download_tarball(url, path, logger, expected_md5=None):
+    util.download_if_needed(url, path + '.tar.gz', expected_md5=expected_md5)
     util.extract_tarball(path + '.tar.gz', path, logger, reset_permissions=True)
     os.remove(path + '.tar.gz')
     for file in glob(path + '/*/*') + glob(path + '/*/.*'):
