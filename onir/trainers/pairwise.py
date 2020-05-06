@@ -11,7 +11,7 @@ class PairwiseTrainer(trainers.Trainer):
     def default_config():
         result = trainers.Trainer.default_config()
         result.update({
-            'lossfn': onir.config.Choices(['softmax', 'cross_entropy', 'hinge']),
+            'lossfn': onir.config.Choices(['softmax', 'cross_entropy', 'nogueira_cross_entropy', 'hinge']),
             'pos_source': onir.config.Choices(['intersect', 'qrels']),
             'neg_source': onir.config.Choices(['run', 'qrels', 'union']),
             'sampling': onir.config.Choices(['query', 'qrel']),
@@ -27,6 +27,7 @@ class PairwiseTrainer(trainers.Trainer):
         self.loss_fn = {
             'softmax': self.softmax,
             'cross_entropy': self.cross_entropy,
+            'nogueira_cross_entropy': self.nogueira_cross_entropy,
             'hinge': self.hinge
         }[config['lossfn']]
         self.dataset = train_ds
@@ -101,6 +102,16 @@ class PairwiseTrainer(trainers.Trainer):
     def cross_entropy(rel_scores_by_record):
         target = torch.zeros(rel_scores_by_record.shape[0]).long().to(rel_scores_by_record.device)
         return F.cross_entropy(rel_scores_by_record, target, reduction='mean')
+
+    @staticmethod
+    def nogueira_cross_entropy(rel_scores_by_record):
+        """
+        cross entropy loss formulation for BERT from:
+         > Rodrigo Nogueira and Kyunghyun Cho. 2019.Passage re-ranking with bert. ArXiv,
+         > abs/1901.04085.
+        """
+        log_probs = -rel_scores_by_record.log_softmax(dim=2)
+        return (log_probs[:, 0, 0] + log_probs[:, 1, 1]).mean()
 
     @staticmethod
     def softmax(rel_scores_by_record):
