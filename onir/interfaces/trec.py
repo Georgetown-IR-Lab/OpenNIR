@@ -15,7 +15,7 @@ from onir import indices, util
 
 
 class Qrels:
-    def __init__(self, data, sep=' '):
+    def __init__(self, data, sep=None):
         self._data = {}
         self._sep = sep
         self._iter = None
@@ -90,19 +90,19 @@ class Qrels:
             plaintext.write_sv(path, it, sep=(sep or self._sep))
 
 
-def read_qrels(file: str, sep: str = ' ') -> Iterator[Tuple[str, str, int]]:
+def read_qrels(file: str, sep: str = None) -> Iterator[Tuple[str, str, int]]:
     return iter(Qrels(file, sep))
 
 
-def read_qrels_dict(file: str, sep: str = ' ') -> Dict[str, Dict[str, int]]:
+def read_qrels_dict(file: str, sep: str = None) -> Dict[str, Dict[str, int]]:
     return Qrels(file, sep).dict()
 
 
-def read_qrels_df(file: str, sep: str = ' ') -> pd.DataFrame:
+def read_qrels_df(file: str, sep: str = None) -> pd.DataFrame:
     return Qrels(file, sep).df()
 
 
-def read_qrels_fmt(file: str, fmt: str, sep: str = ' '):
+def read_qrels_fmt(file: str, fmt: str, sep: str = None):
     return Qrels(file, sep).get(fmt)
 
 

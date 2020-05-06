@@ -1,0 +1,16 @@
+../msmarco
+train_ds.init_skip_train_med=False
+valid_ds.init_skip_train_med=False
+../vanilla_bert
+ranker.outputs=2
+trainer.lossfn=nogueira_cross_entropy
+vocab.bert_base=scibert
+test_ds=covid
+test_ds.subset=rnd1-quest
+test_ds.rr_field=title_abs
+test_ds.bs_field=text
+test_ds.rankfn=bm25_k1-3.9_b-0.55
+test_pred.measures=p@5,ndcg@10,p_rel-2@5,judged@5
+test_ds.bs_override=rnd1-query
+test_ds.ranktopk=500
+test_ds.2020_filter=True

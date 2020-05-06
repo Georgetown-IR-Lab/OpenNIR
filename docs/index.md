@@ -53,6 +53,7 @@ $ bash scripts/pipeline.sh config/antique config/vanilla_bert
  - [Datasets](datasets.html)
  - [Vocabularies](vocab.html)
  - [Multi-lingual experiments](multilingual.html)
+ - [COVID-19 Search](https://github.com/Georgetown-IR-Lab/covid-neural-ir)
 
 
 ### Citing OpenNIR
