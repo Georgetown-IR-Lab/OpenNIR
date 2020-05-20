@@ -7,6 +7,7 @@ def record_iter(dataset,
                 fields: set,
                 source: str, # one of ['run', 'qrels']
                 minrel: int = None, # integer indicating the minimum relevance score, or None for unfiltered
+                run_threshold: int = 0, # integer representing cutoff rank threshold (if > 0)
                 shuf: bool = True,
                 random=None,
                 inf: bool = False
@@ -16,6 +17,12 @@ def record_iter(dataset,
 
     if source == 'run':
         src = run_fn()
+        if run_threshold > 0:
+            # cut off the run by rank (by query)
+            src = src.sort_values(['qid', 'score'], ascending=False) \
+                     .groupby('qid') \
+                     .head(run_threshold) \
+                     .reset_index(drop=True)
         if minrel is not None:
             src = src[src['score'] >= minrel]
             src = pd.merge(src, qrels_fn(), on=['qid', 'did'], suffixes=('_run', '_qrels'))

@@ -3,6 +3,8 @@ An end-to-end neural ad-hoc ranking pipeline.
 
 ## Quick start
 
+*OpenNIR requires Python 3.6* (not tested with other versions).
+
 Install dependencies
 
 ```bash
@@ -53,6 +55,7 @@ the `ONIR_ARGS` environment variable.
  - ANTIQUE `config/antique`
  - TREC CAR `config/car`
  - New York Times `config/nyt` -- for [content-based weak supervision](https://arxiv.org/abs/1707.00189)
+ - TREC Arabic, Mandarin, and Spanish `config/multiling/*` -- for [zero-shot multilingual transfer learning](https://arxiv.org/pdf/1912.13080.pdf) ([instructions](https://opennir.net/multilingual.html))
 
 ### Evaluation Metrics
 

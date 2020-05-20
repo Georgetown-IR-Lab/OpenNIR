@@ -11,6 +11,9 @@ def main():
 
     context['dataset'].init()
 
+    num_docs = context['dataset'].num_docs()
+    logger.info(f'dataset is initialized ({num_docs} documents)')
+
 
 if __name__ == '__main__':
     main()

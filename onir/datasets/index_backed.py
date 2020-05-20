@@ -148,6 +148,9 @@ class IndexBackedDataset(datasets.Dataset):
     def _get_index_for_batchsearch(self):
         raise NotImplementedError
 
+    def _lang(self):
+        return "en"
+
     def _query_rawtext(self, record):
         return self._load_queries_base(self.config['subset'])[record['query_id']]
 
@@ -163,6 +166,9 @@ class IndexBackedDataset(datasets.Dataset):
 
     def _query_len(self, record):
         return len(record['query_text'])
+
+    def _query_lang(self, record):
+        return self._lang()
 
     def _query_score(self, record):
         index = self._get_index(record)
@@ -185,6 +191,9 @@ class IndexBackedDataset(datasets.Dataset):
     def _doc_len(self, record):
         return len(record['doc_text'])
 
+    def _doc_lang(self, record):
+        return self._lang()
+
     def _runscore(self, record):
         index = self._get_index(record)
         return index.get_query_doc_scores(record['query_text'], record['doc_id'], self.config['rankfn'])[0]
@@ -204,12 +213,14 @@ class LazyDataRecord:
             'query_tok': ds._query_tok,
             'query_idf': ds._query_idf,
             'query_len': ds._query_len,
+            'query_lang': ds._query_lang,
             'query_score': ds._query_score,
             'doc_rawtext': ds._doc_rawtext,
             'doc_text': ds._doc_text,
             'doc_tok': ds._doc_tok,
             'doc_idf': ds._doc_idf,
             'doc_len': ds._doc_len,
+            'doc_lang': ds._doc_lang,
             'runscore': ds._runscore,
             'relscore': ds._relscore,
         }

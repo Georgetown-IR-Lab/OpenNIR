@@ -19,6 +19,7 @@ _SOURCES = {
     'train-qrels': 'https://msmarco.blob.core.windows.net/msmarcoranking/qrels.train.tsv',
     'dev-qrels': 'https://msmarco.blob.core.windows.net/msmarcoranking/qrels.dev.tsv',
     # 'qidpidtriples.train.full': 'https://msmarco.blob.core.windows.net/msmarcoranking/qidpidtriples.train.full.tar.gz',
+    # seems the qidpidtriples.train.full link is broken... I'll host a mirror until they fix
     'qidpidtriples.train.full': 'https://macavaney.us/misc/qidpidtriples.train.full.tar.gz',
     'train.msrun': 'https://msmarco.blob.core.windows.net/msmarcoranking/top1000.train.tar.gz',
     'dev.msrun': 'https://msmarco.blob.core.windows.net/msmarcoranking/top1000.dev.tar.gz',
@@ -62,11 +63,14 @@ http://www.msmarco.org/dataset.aspx"""
     def default_config():
         result = datasets.IndexBackedDataset.default_config()
         result.update({
-            'subset': onir.config.Choices(['train', 'dev', 'minidev', 'judgeddev', 'eval', 'trec2019', 'judgedtrec2019']),
+            'subset': onir.config.Choices(['train', 'train10', 'train_med', 'dev', 'minidev', 'judgeddev', 'eval', 'trec2019', 'judgedtrec2019']),
             'rankfn': onir.config.Ranker(),
             'ranktopk': 100,
             'special': onir.config.Choices(['', 'mspairs', 'msrun', 'validrun']),
             'index': onir.config.Choices(['default', 'doctttttquery']),
+            'init_skip_train10': True,
+            'init_skip_train_med': True,
+            'init_skip_msrun': True,
             # validrun made with `cat ~/data/onir/datasets/msmarco/anserini.porter.minidev.runs/bm25.1000.run ~/data/onir/datasets/msmarco/minidev.qrels | awk 'NF==4||(NF==6&&($4==1||$4==2||$4==3||$4==4||$4==6||$4==8||$4==11||$4==16||$4==22||$4==31||$4==43||$4==60||$4==83||$4==116||$4==162||$4==227||$4==316||$4==441||$4==616||$4==859)){print $1, $3}' | sort | uniq`
         })
         return result
@@ -74,16 +78,15 @@ http://www.msmarco.org/dataset.aspx"""
     def __init__(self, config, logger, vocab):
         super().__init__(config, logger, vocab)
         base_path = util.path_dataset(self)
-        self.index = indices.AnseriniIndex(os.path.join(base_path, 'anserini'), stemmer='none')
         self.index_stem = indices.AnseriniIndex(os.path.join(base_path, 'anserini.porter'), stemmer='porter')
         self.index_doctttttquery_stem = indices.AnseriniIndex(os.path.join(base_path, 'anserini.doctttttquery.porter'), stemmer='porter')
         self.doc_store = indices.SqliteDocstore(os.path.join(base_path, 'docs.sqllite'))
 
-    def _get_index(self, record):
-        return self.index
-
     def _get_docstore(self):
         return self.doc_store
+
+    def _get_index(self, record):
+        return self.index_stem
 
     def _get_index_for_batchsearch(self):
         return {
@@ -137,15 +140,15 @@ http://www.msmarco.org/dataset.aspx"""
                             result[f].append(record[f])
                     yield result
 
-    def record_iter(self, fields, source, minrel=None, shuf=True, random=None, run_threshold=0, inf=False):
+    def record_iter(self, fields, source, minrel=None, shuf=True, random=None, inf=False, run_threshold=None):
         special = self.config['special']
         if special == '':
             raise NotImplementedError
         assert minrel is None or minrel < 1
         if source != 'run':
             self.logger.warn(f'Using special={special}; ingoring record_iter arguments source={source}')
-        if run_threshold != 0:
-            self.logger.warn(f'Using special={special}; ingoring record_iter argument run_threshold={run_threshold}')
+        if run_threshold is not None:
+            self.logger.warn(f'Using special={special}; ingoring record_iter arguments run_threshold={run_threshold}')
         first = True
         while first or inf:
             first = False
@@ -192,7 +195,7 @@ http://www.msmarco.org/dataset.aspx"""
         return result
 
     def init(self, force=False):
-        idxs = [self.index, self.index_stem, self.doc_store]
+        idxs = [self.index_stem, self.doc_store]
         self._init_indices_parallel(idxs, self._init_iter_collection(), force)
         self._init_indices_parallel([self.index_doctttttquery_stem], self._init_doctttttquery_iter(), force)
 
@@ -250,23 +253,24 @@ http://www.msmarco.org/dataset.aspx"""
         if (force or not os.path.exists(file)) and self._confirm_dua():
             util.download(_SOURCES['qidpidtriples.train.full'], file, expected_md5=_HASHES['qidpidtriples.train.full'])
 
-        for file_name, subf in [('dev.msrun', 'top1000.dev'), ('eval.msrun', 'top1000.eval'), ('train.msrun', 'top1000.train.txt')]:
-            file = os.path.join(base_path, file_name)
-            if (force or not os.path.exists(file)) and self._confirm_dua():
-                run = {}
-                with util.download_tmp(_SOURCES[file_name], expected_md5=_HASHES[file_name]) as f, \
-                     tarfile.open(fileobj=f) as tarf:
-                    for qid, did, _, _ in tqdm(plaintext.read_tsv(io.TextIOWrapper(tarf.extractfile(subf)))):
-                        if qid not in run:
-                            run[qid] = {}
-                        run[qid][did] = 0.
-                if file_name == 'train.msrun':
-                    minidev = {qid: dids for qid, dids in run.items() if qid in MINI_DEV}
-                    with self.logger.duration('writing minidev.msrun'):
-                        trec.write_run_dict(os.path.join(base_path, 'minidev.msrun'), minidev)
-                    run = {qid: dids for qid, dids in run.items() if qid not in MINI_DEV}
-                with self.logger.duration(f'writing {file_name}'):
-                    trec.write_run_dict(file, run)
+        if not self.config['init_skip_msrun']:
+            for file_name, subf in [('dev.msrun', 'top1000.dev'), ('eval.msrun', 'top1000.eval'), ('train.msrun', 'top1000.train.txt')]:
+                file = os.path.join(base_path, file_name)
+                if (force or not os.path.exists(file)) and self._confirm_dua():
+                    run = {}
+                    with util.download_tmp(_SOURCES[file_name], expected_md5=_HASHES[file_name]) as f, \
+                         tarfile.open(fileobj=f) as tarf:
+                        for qid, did, _, _ in tqdm(plaintext.read_tsv(io.TextIOWrapper(tarf.extractfile(subf)))):
+                            if qid not in run:
+                                run[qid] = {}
+                            run[qid][did] = 0.
+                    if file_name == 'train.msrun':
+                        minidev = {qid: dids for qid, dids in run.items() if qid in MINI_DEV}
+                        with self.logger.duration('writing minidev.msrun'):
+                            trec.write_run_dict(os.path.join(base_path, 'minidev.msrun'), minidev)
+                        run = {qid: dids for qid, dids in run.items() if qid not in MINI_DEV}
+                    with self.logger.duration(f'writing {file_name}'):
+                        trec.write_run_dict(file, run)
 
         query_path = os.path.join(base_path, 'trec2019.queries.tsv')
         if (force or not os.path.exists(query_path)) and self._confirm_dua():
@@ -313,41 +317,77 @@ http://www.msmarco.org/dataset.aspx"""
                 for qid, qtext in plaintext.read_tsv(os.path.join(base_path, 'dev.queries.tsv')):
                     if qid in judged_qids():
                         plaintext.write_tsv(f, [(qid, qtext)])
-        if not os.path.exists(f'{judgeddev_path}.msrun'):
-            with util.finialized_file(f'{judgeddev_path}.msrun', 'wt') as f:
-                for qid, dids in trec.read_run_dict(os.path.join(base_path, 'dev.msrun')).items():
-                    if qid in judged_qids():
-                        trec.write_run_dict(f, {qid: dids})
+        if self.config['init_skip_msrun']:
+            if not os.path.exists(f'{judgeddev_path}.msrun'):
+                with util.finialized_file(f'{judgeddev_path}.msrun', 'wt') as f:
+                    for qid, dids in trec.read_run_dict(os.path.join(base_path, 'dev.msrun')).items():
+                        if qid in judged_qids():
+                            trec.write_run_dict(f, {qid: dids})
 
-        file = os.path.join(base_path, 'train10.queries.tsv')
-        if not os.path.exists(file):
-            with util.finialized_file(file, 'wt') as fout:
-                for qid, qtext in self.logger.pbar(plaintext.read_tsv(os.path.join(base_path, 'train.queries.tsv')), desc='filtering queries for train10'):
-                    if int(qid) % 10 == 0:
-                        plaintext.write_tsv(fout, [(qid, qtext)])
+        if not self.config['init_skip_train10']:
+            file = os.path.join(base_path, 'train10.queries.tsv')
+            if not os.path.exists(file):
+                with util.finialized_file(file, 'wt') as fout:
+                    for qid, qtext in self.logger.pbar(plaintext.read_tsv(os.path.join(base_path, 'train.queries.tsv')), desc='filtering queries for train10'):
+                        if int(qid) % 10 == 0:
+                            plaintext.write_tsv(fout, [(qid, qtext)])
 
-        file = os.path.join(base_path, 'train10.qrels')
-        if not os.path.exists(file):
-            with util.finialized_file(file, 'wt') as fout, open(os.path.join(base_path, 'train.qrels'), 'rt') as fin:
-                for line in self.logger.pbar(fin, desc='filtering qrels for train10'):
-                    qid = line.split()[0]
-                    if int(qid) % 10 == 0:
-                        fout.write(line)
+            file = os.path.join(base_path, 'train10.qrels')
+            if not os.path.exists(file):
+                with util.finialized_file(file, 'wt') as fout, open(os.path.join(base_path, 'train.qrels'), 'rt') as fin:
+                    for line in self.logger.pbar(fin, desc='filtering qrels for train10'):
+                        qid = line.split()[0]
+                        if int(qid) % 10 == 0:
+                            fout.write(line)
 
-        file = os.path.join(base_path, 'train10.msrun')
-        if not os.path.exists(file):
-            with util.finialized_file(file, 'wt') as fout, open(os.path.join(base_path, 'train.msrun'), 'rt') as fin:
-                for line in self.logger.pbar(fin, desc='filtering msrun for train10'):
-                    qid = line.split()[0]
-                    if int(qid) % 10 == 0:
-                        fout.write(line)
+            if not self.config['init_skip_msrun']:
+                file = os.path.join(base_path, 'train10.msrun')
+                if not os.path.exists(file):
+                    with util.finialized_file(file, 'wt') as fout, open(os.path.join(base_path, 'train.msrun'), 'rt') as fin:
+                        for line in self.logger.pbar(fin, desc='filtering msrun for train10'):
+                            qid = line.split()[0]
+                            if int(qid) % 10 == 0:
+                                fout.write(line)
 
-        file = os.path.join(base_path, 'train10.mspairs.gz')
-        if not os.path.exists(file):
-            with gzip.open(file, 'wt') as fout, gzip.open(os.path.join(base_path, 'train.mspairs.gz'), 'rt') as fin:
-                for qid, did1, did2 in self.logger.pbar(plaintext.read_tsv(fin), desc='filtering mspairs for train10'):
-                    if int(qid) % 10 == 0:
-                        plaintext.write_tsv(fout, [(qid, did1, did2)])
+            file = os.path.join(base_path, 'train10.mspairs.gz')
+            if not os.path.exists(file):
+                with gzip.open(file, 'wt') as fout, gzip.open(os.path.join(base_path, 'train.mspairs.gz'), 'rt') as fin:
+                    for qid, did1, did2 in self.logger.pbar(plaintext.read_tsv(fin), desc='filtering mspairs for train10'):
+                        if int(qid) % 10 == 0:
+                            plaintext.write_tsv(fout, [(qid, did1, did2)])
+
+        if not self.config['init_skip_train_med']:
+            med_qids = util.Lazy(lambda: {qid.strip() for qid in util.download_stream('https://raw.githubusercontent.com/Georgetown-IR-Lab/covid-neural-ir/master/med-msmarco-train.txt', 'utf8', expected_md5="dc5199de7d4a872c361f89f08b1163ef")})
+            file = os.path.join(base_path, 'train_med.queries.tsv')
+            if not os.path.exists(file):
+                with util.finialized_file(file, 'wt') as fout:
+                    for qid, qtext in self.logger.pbar(plaintext.read_tsv(os.path.join(base_path, 'train.queries.tsv')), desc='filtering queries for train_med'):
+                        if qid in med_qids():
+                            plaintext.write_tsv(fout, [(qid, qtext)])
+
+            file = os.path.join(base_path, 'train_med.qrels')
+            if not os.path.exists(file):
+                with util.finialized_file(file, 'wt') as fout, open(os.path.join(base_path, 'train.qrels'), 'rt') as fin:
+                    for line in self.logger.pbar(fin, desc='filtering qrels for train_med'):
+                        qid = line.split()[0]
+                        if qid in med_qids():
+                            fout.write(line)
+
+            if not self.config['init_skip_msrun']:
+                file = os.path.join(base_path, 'train_med.msrun')
+                if not os.path.exists(file):
+                    with util.finialized_file(file, 'wt') as fout, open(os.path.join(base_path, 'train.msrun'), 'rt') as fin:
+                        for line in self.logger.pbar(fin, desc='filtering msrun for train_med'):
+                            qid = line.split()[0]
+                            if qid in med_qids():
+                                fout.write(line)
+
+            file = os.path.join(base_path, 'train_med.mspairs.gz')
+            if not os.path.exists(file):
+                with gzip.open(file, 'wt') as fout, gzip.open(os.path.join(base_path, 'train.mspairs.gz'), 'rt') as fin:
+                    for qid, did1, did2 in self.logger.pbar(plaintext.read_tsv(fin), desc='filtering mspairs for train_med'):
+                        if qid in med_qids():
+                            plaintext.write_tsv(fout, [(qid, did1, did2)])
 
     def _init_iter_collection(self):
         with util.download_tmp(_SOURCES['collection'], expected_md5=_HASHES['collection']) as f:

@@ -15,7 +15,7 @@ from onir import indices, util
 
 
 class Qrels:
-    def __init__(self, data, sep=' '):
+    def __init__(self, data, sep=None):
         self._data = {}
         self._sep = sep
         self._iter = None
@@ -90,19 +90,19 @@ class Qrels:
             plaintext.write_sv(path, it, sep=(sep or self._sep))
 
 
-def read_qrels(file: str, sep: str = ' ') -> Iterator[Tuple[str, str, int]]:
+def read_qrels(file: str, sep: str = None) -> Iterator[Tuple[str, str, int]]:
     return iter(Qrels(file, sep))
 
 
-def read_qrels_dict(file: str, sep: str = ' ') -> Dict[str, Dict[str, int]]:
+def read_qrels_dict(file: str, sep: str = None) -> Dict[str, Dict[str, int]]:
     return Qrels(file, sep).dict()
 
 
-def read_qrels_df(file: str, sep: str = ' ') -> pd.DataFrame:
+def read_qrels_df(file: str, sep: str = None) -> pd.DataFrame:
     return Qrels(file, sep).df()
 
 
-def read_qrels_fmt(file: str, fmt: str, sep: str = ' '):
+def read_qrels_fmt(file: str, fmt: str, sep: str = None):
     return Qrels(file, sep).get(fmt)
 
 
@@ -238,9 +238,8 @@ def _strip_html(doc_text):
 def parse_doc_format(path, encoding="ISO-8859-1"):
     files = list(_parse_doc_format_files(path))
     args = [(f, encoding) for f in files]
-    with Pool(util.safe_thread_count()) as pool:
-        for docs in pool.imap_unordered(_parse_doc_file, args):
-            yield from docs
+    for docs in map(_parse_doc_file, args):
+        yield from docs
 
 def _parse_doc_format_files(path):
     if os.path.isdir(path):
@@ -280,16 +279,16 @@ def _parse_doc_file(args):
                         break
                     line += l
                 docid = line.replace('<DOCNO>', '').replace('</DOCNO>', '').strip()
-            elif tag_no is not None:
-                doc_text += line
-                if line.startswith(DOC_TEXT_END_TAGS[tag_no]):
-                    tag_no = None
             elif line.startswith('</DOC>'):
                 assert docid is not None
                 docs.append(indices.RawDoc(docid, _strip_html(doc_text)))
                 docid = None
                 doc_text = ''
                 tag_no = None
+            elif tag_no is not None:
+                doc_text += line
+                if line.startswith(DOC_TEXT_END_TAGS[tag_no]):
+                    tag_no = None
             else:
                 for i, tag in enumerate(DOC_TEXT_TAGS):
                     if line.startswith(tag):
