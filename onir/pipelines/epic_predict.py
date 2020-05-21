@@ -202,13 +202,11 @@ class EpicCacheReader:
                         pass
                 file.close()
             self.lookup = self.dvec_lookup_pruned
-            self.totals = self.totals_pruned
         else:
             if in_memory:
                 mmp = file.read()
                 file.close()
             self.lookup = self.dvec_lookup_unpruned
-            self.totals = self.totals_unpruned
 
         self.prune = prune
         self.num_docs = num_docs
@@ -216,7 +214,6 @@ class EpicCacheReader:
         self.mmp = mmp
         self.gpu = gpu
         self.in_memory = in_memory
-        self._totals = None
 
     def close(self):
         self.file.close()
@@ -286,30 +283,3 @@ class EpicCacheReader:
         if self.gpu:
             result = result.cuda()
         return result
-
-    def totals_pruned(self):
-        S_DTYPE = 2
-        if self._totals is None:
-            fname = self.file.name + '.totals'
-            if os.path.exists(fname):
-                with open(fname, 'rb') as f:
-                    self._totals = np.frombuffer(f.read(), dtype='f8')
-                    self._totals = torch.tensor(self._totals).float()
-            else:
-                with open(self.file.name, 'rb') as f:
-                    self._totals = np.zeros(self.vocab_size, dtype='f8')
-                    for did in logger.pbar(range(self.num_docs), desc='loading dvecs'):
-                        try:
-                            poss = np.frombuffer(f.read(self.prune*S_DTYPE), dtype='i2')
-                            vals = np.frombuffer(f.read(self.prune*S_DTYPE), dtype='f2')
-                            self._totals[poss] += vals
-                        except ValueError:
-                            pass
-                with open(fname, 'wb') as f:
-                    f.write(self._totals.tobytes())
-                self._totals = torch.tensor(self._totals).float()
-
-        return self._totals
-
-    def totals_unpruned(self):
-        raise NotImplementedError
