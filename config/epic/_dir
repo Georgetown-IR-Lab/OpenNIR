@@ -1,0 +1,6 @@
+ranker=epic
+
+vocab=bert
+vocab.encoding=sep
+vocab.last_layer=True
+vocab.train=True

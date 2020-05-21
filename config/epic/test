@@ -1,0 +1,5 @@
+./train_validate
+
+pipeline=epic_predict
+pipelie.eval=True
+test_ds.subset=judgeddev

@@ -208,6 +208,10 @@ class DurationTimer:
         counts = ' '.join(f'{k}={v:.2f}s' for k, v in self.durations.items())
         return f'<DurationTimer {counts}>'
 
+    def scaled_str(self, scale):
+        counts = ' '.join(f'{k}={format_interval(v/scale)}' for k, v in self.durations.items())
+        return f'<DurationTimer {counts}>'
+
 
 class HierTimer(DurationTimer):
     def __init__(self, gpu_sync=False, enabled=True):
@@ -358,3 +362,15 @@ class Registry:
         result = Registry(default=default or self.default)
         result.registered = dict(self.registered)
         return result
+
+def format_interval(t):
+    # adapted from tqdm.format_interval, but with better support for short durations (under 1min)
+    mins, s = divmod(t, 60)
+    h, m = divmod(int(mins), 60)
+    if h:
+        return '{0:d}:{1:02d}:{2:02.0f}'.format(h, m, s)
+    if m:
+        return '{0:02d}:{1:02.0f}'.format(m, s)
+    if s >= 1:
+        return '{0:.2f}s'.format(s)
+    return '{0:.0f}ms'.format(s*1000)

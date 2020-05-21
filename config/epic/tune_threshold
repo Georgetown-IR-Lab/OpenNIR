@@ -1,0 +1,6 @@
+./train_validate
+
+pipeline=tune_rerank_threshold
+test_ds.ranktopk=200
+test_ds.subset=minidev
+test_pred.batch_size=8

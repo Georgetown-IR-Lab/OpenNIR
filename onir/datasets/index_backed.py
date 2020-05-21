@@ -60,6 +60,9 @@ class IndexBackedDataset(datasets.Dataset):
     def all_query_ids(self):
         yield from self._load_queries_base(self.config['subset']).keys()
 
+    def all_queries_raw(self):
+        return self._load_queries_base(self.config['subset']).items()
+
     def num_queries(self):
         return sum(1 for _ in self.all_query_ids())
 

@@ -137,7 +137,7 @@ class Logger:
         t = time()
         self.logger.log(LOGGER_LEVELS[level], f'[starting] {message}')
         yield
-        output_duration = format_interval(time() - t)
+        output_duration = util.format_interval(time() - t)
         self.logger.log(LOGGER_LEVELS[level], f'[finished] {message} [{output_duration}]')
 
 
@@ -158,18 +158,6 @@ def disable_tqdm():
     global _tqdm_status
     _tqdm_status = False
 
-def format_interval(t):
-    # adapted from tqdm.format_interval, but with better support for short durations (under 1min)
-    mins, s = divmod(t, 60)
-    h, m = divmod(int(mins), 60)
-    if h:
-        return '{0:d}:{1:02d}:{2:02.0f}'.format(h, m, s)
-    if m:
-        return '{0:02d}:{1:02.0f}'.format(m, s)
-    if s >= 1:
-        return '{0:.2f}s'.format(s)
-    return '{0:.0f}ms'.format(s*1000)
-
 
 # override tqdm.format_interval
-tqdm.format_interval = format_interval
+tqdm.format_interval = util.format_interval

@@ -39,6 +39,9 @@ class Dataset:
     def all_query_ids(self):
         raise NotImplementedError
 
+    def all_queries_raw(self):
+        raise NotImplementedError
+
     def num_queries(self):
         raise NotImplementedError
 

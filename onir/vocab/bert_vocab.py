@@ -74,7 +74,7 @@ class BertVocab(vocab.Vocab):
         return 'bert_{bert_base}'.format(**self.config)
 
     def lexicon_size(self) -> int:
-        return len(self.tokenizer.vocab)
+        return self.tokenizer._tokenizer.get_vocab_size()
 
 
 class BaseBertEncoder(vocab.VocabEncoder):

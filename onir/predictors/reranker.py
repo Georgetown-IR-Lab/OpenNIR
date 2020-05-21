@@ -109,6 +109,13 @@ class Reranker(predictors.BasePredictor):
                         yield qid, did, score.item()
                     pbar.update(len(batch['query_id']))
 
+    def rerank_dict(self, ranker, device):
+        datasource = self._reload_batches(device)
+        result = {}
+        for qid, did, score in self.iter_scores(ranker, datasource, device):
+            result.setdefault(qid, {})[did] = score
+        return result
+
 
 class PredictorContext:
     def __init__(self, pred, datasource, device):

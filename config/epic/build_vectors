@@ -1,0 +1,3 @@
+./train_validate
+
+pipeline=epic_vectorize
