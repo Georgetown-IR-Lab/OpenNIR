@@ -71,6 +71,7 @@ http://www.msmarco.org/dataset.aspx"""
             'init_skip_train10': True,
             'init_skip_train_med': True,
             'init_skip_msrun': True,
+            'init_skip_doctttttquery': True,
             # validrun made with `cat ~/data/onir/datasets/msmarco/anserini.porter.minidev.runs/bm25.1000.run ~/data/onir/datasets/msmarco/minidev.qrels | awk 'NF==4||(NF==6&&($4==1||$4==2||$4==3||$4==4||$4==6||$4==8||$4==11||$4==16||$4==22||$4==31||$4==43||$4==60||$4==83||$4==116||$4==162||$4==227||$4==316||$4==441||$4==616||$4==859)){print $1, $3}' | sort | uniq`
         })
         return result
@@ -197,7 +198,8 @@ http://www.msmarco.org/dataset.aspx"""
     def init(self, force=False):
         idxs = [self.index_stem, self.doc_store]
         self._init_indices_parallel(idxs, self._init_iter_collection(), force)
-        self._init_indices_parallel([self.index_doctttttquery_stem], self._init_doctttttquery_iter(), force)
+        if not self.config['init_skip_doctttttquery']:
+            self._init_indices_parallel([self.index_doctttttquery_stem], self._init_doctttttquery_iter(), force)
 
         base_path = util.path_dataset(self)
 
