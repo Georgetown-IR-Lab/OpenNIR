@@ -166,17 +166,6 @@ class EpicPredictionPipeline(pipelines.BasePipeline):
             doc_scores = self.ranker.similarity_inference(qvec, dvecs)
             for did, score in zip(dids, doc_scores.cpu()):
                 result[str(did)] = score.item()
-        # estimate a relevance model
-        EXP_TERMS, EXP_DOCS = 10, 5
-        top_docs = doc_scores.topk(EXP_DOCS)
-        ddvecs = dvecs.to_dense()[top_docs.indices]
-        nddvecs = ddvecs / ddvecs.sum(dim=1, keepdim=True) * top_docs.values.unsqueeze(1)
-        ndterms = nddvecs.topk(k=EXP_TERMS, dim=1)
-        indices = torch.stack([torch.tensor([[d] * EXP_TERMS for d in range(EXP_DOCS)]).cuda().flatten(), ndterms.indices.flatten()])
-        values = ndterms.values.flatten()
-        result_size = torch.Size([EXP_DOCS, self.vocab.lexicon_size()])
-        exp_model = torch.sparse.FloatTensor(indices, values, result_size)
-        import pdb; pdb.set_trace()
         return result
 
 
