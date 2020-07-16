@@ -319,7 +319,7 @@ http://www.msmarco.org/dataset.aspx"""
                 for qid, qtext in plaintext.read_tsv(os.path.join(base_path, 'dev.queries.tsv')):
                     if qid in judged_qids():
                         plaintext.write_tsv(f, [(qid, qtext)])
-        if self.config['init_skip_msrun']:
+        if not self.config['init_skip_msrun']:
             if not os.path.exists(f'{judgeddev_path}.msrun'):
                 with util.finialized_file(f'{judgeddev_path}.msrun', 'wt') as f:
                     for qid, dids in trec.read_run_dict(os.path.join(base_path, 'dev.msrun')).items():
