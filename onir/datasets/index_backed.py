@@ -1,8 +1,9 @@
 import os
 import functools
 import contextlib
-from glob import glob
 import pickle
+from glob import glob
+from pytools import memoize_method
 from onir import datasets, util
 from onir.interfaces import trec
 
@@ -201,6 +202,36 @@ class IndexBackedDataset(datasets.Dataset):
     def _relscore(self, record):
         return float(self.qrels('dict').get(record['query_id'], {}).get(record['doc_id'], -999))
 
+    def _kdescore(self, record):
+        return self._kde_crf(record['query_id'])(record['runscore']).item()
+
+    def _normscore(self, record):
+        return self._norm(record['query_id'])(record['runscore'])
+
+    def _rank(self, record):
+        ranks = self._rank_dict()
+        return ranks[record['query_id']].get(record['doc_id'], 1000)
+
+    @memoize_method
+    def _kde_crf(self, qid):
+        run = self.run_dict().get(qid, {})
+        return util.kde_cdf_from_run(run)
+
+    @memoize_method
+    def _norm(self, qid):
+        scores = self.run_dict().get(qid, {}).values()
+        mx, mn = max(scores), min(scores)
+        return lambda x: (x - mn) / (mx - mn)
+
+    @memoize_method
+    def _rank_dict(self):
+        run = self.run_dict()
+        result = {}
+        for qid in run:
+            sorted_docs = sorted(run[qid].items(), key=lambda x: (x[1], x[0]), reverse=True)
+            result[qid] = {did: rank+1 for rank, (did, score) in enumerate(sorted_docs)}
+        return result
+
 
 class LazyDataRecord:
     def __init__(self, ds, **data):
@@ -223,6 +254,9 @@ class LazyDataRecord:
             'doc_lang': ds._doc_lang,
             'runscore': ds._runscore,
             'relscore': ds._relscore,
+            'kdescore': ds._kdescore,
+            'normscore': ds._normscore,
+            'rank': ds._rank,
         }
 
     def __getitem__(self, key):
