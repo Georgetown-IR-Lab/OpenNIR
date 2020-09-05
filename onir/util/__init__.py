@@ -374,3 +374,10 @@ def format_interval(t):
     if s >= 1:
         return '{0:.2f}s'.format(s)
     return '{0:.0f}ms'.format(s*1000)
+
+
+def kde_cdf_from_run(run):
+    scores = list(run.values())
+    kde = gaussian_kde(scores)
+    cdf = np.vectorize(lambda x: kde.integrate_box_1d(-np.inf, x))
+    return cdf

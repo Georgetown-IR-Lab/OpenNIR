@@ -8,3 +8,6 @@ from onir.trainers.base import Trainer
 from onir.trainers.trivial import TrivialTrainer
 from onir.trainers.pointwise import PointwiseTrainer
 from onir.trainers.pairwise import PairwiseTrainer
+
+from onir.trainers.pairwise_cl import PairwiseClTrainer
+from onir.trainers.pointwise_cl import PointwiseClTrainer

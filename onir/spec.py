@@ -15,7 +15,7 @@ def apply_spec_batch(batch, input_spec, device=None):
             minlen = input_spec.get('dlen_min')
             len_mode = input_spec['dlen_mode']
 
-        if k in ('runscore', 'relscore'):
+        if k in ('runscore', 'relscore', 'kdescore', 'normscore', 'rank'):
             seq_type = 'float'
         elif k.endswith('_len'):
             seq_type = 'int'
