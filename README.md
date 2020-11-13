@@ -3,7 +3,7 @@ An end-to-end neural ad-hoc ranking pipeline.
 
 ## Quick start
 
-*OpenNIR requires Python 3.6* (not tested with other versions).
+*OpenNIR requires Python 3.6* (not tested with other versions). Java 11 is required (for Anserini).
 
 Install dependencies
 
