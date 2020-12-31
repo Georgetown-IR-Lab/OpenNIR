@@ -27,7 +27,7 @@ _SOURCES = {
     'trec2019.queries': 'https://msmarco.blob.core.windows.net/msmarcoranking/msmarco-test2019-queries.tsv.gz',
     'trec2019.msrun': 'https://msmarco.blob.core.windows.net/msmarcoranking/msmarco-passagetest2019-top1000.tsv.gz',
     'trec2019.qrels': 'https://trec.nist.gov/data/deep/2019qrels-pass.txt',
-    'doctttttquery-predictions': 'https://storage.googleapis.com/doctttttquery_git/predicted_queries_topk_sampling.zip',
+    'doctttttquery-predictions': 'https://git.uwaterloo.ca/jimmylin/doc2query-data/raw/master/T5-passage/predicted_queries_topk_sampling.zip',
 }
 
 _HASHES = {
@@ -227,19 +227,15 @@ http://www.msmarco.org/dataset.aspx"""
                     ctxt.enter_context(util.CtxtThread(functools.partial(fn, it)))
 
         file = os.path.join(base_path, 'train.qrels')
-        if (force or not os.path.exists(file)) and self._confirm_dua():
+        file_mini = os.path.join(base_path, 'minidev.qrels')
+        if (force or not os.path.exists(file) or not os.path.exists(file_mini)) and self._confirm_dua():
             stream = util.download_stream(_SOURCES['train-qrels'], 'utf8', expected_md5=_HASHES['train-qrels'])
-            with util.finialized_file(file, 'wt') as out:
+            with util.finialized_file(file, 'wt') as out, util.finialized_file(file_mini, 'wt') as out_mini:
                 for qid, _, did, score in plaintext.read_tsv(stream):
                     if qid not in MINI_DEV:
                         trec.write_qrels(out, [(qid, did, score)])
-
-        file = os.path.join(base_path, 'minidev.qrels')
-        if (force or not os.path.exists(file)) and self._confirm_dua():
-            with util.finialized_file(file, 'wt') as out:
-                for qid, did, score in trec.read_qrels(os.path.join(base_path, 'train.qrels')):
-                    if qid in MINI_DEV:
-                        trec.write_qrels(out, [(qid, did, score)])
+                    else:
+                        trec.write_qrels(out_mini, [(qid, did, score)])
 
         file = os.path.join(base_path, 'dev.qrels')
         if (force or not os.path.exists(file)) and self._confirm_dua():
