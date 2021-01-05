@@ -119,7 +119,7 @@ class EpicPredictionPipeline(pipelines.BasePipeline):
             for i, qid in enumerate(qids):
                 run = initial_runs.get(qid, {})
                 dids = [y[0] for y in sorted(run.items(), key=lambda x: (x[1], x[0]), reverse=True)][:self.config['rerank_threshold']]
-                dvecs = self.load_dvecs(dids, record['query_tok'], dvec_cache)
+                dvecs = self.load_dvecs(dids, records[i]['query_tok'], dvec_cache)
                 run = self.rerank(dids, qvecs[i].unsqueeze(0).coalesce(), dvecs, dvec_cache)
                 if self.config['output']:
                     trec.write_run_dict(output_file, {qid: run})
