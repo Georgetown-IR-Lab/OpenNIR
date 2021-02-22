@@ -99,7 +99,11 @@ class Logger:
             kwargs['total'] = operator.length_hint(it)
         if 'smoothing' not in kwargs:
             kwargs['smoothing'] = 0. # disable smoothing by default; mean over entire life of pbar
-        pbar = tqdm(it, *args, **kwargs)
+        if 'tqdm' in kwargs:
+            this_tqdm = kwargs.pop('tqdm')
+        else:
+            this_tqdm = tqdm
+        pbar = this_tqdm(it, *args, **kwargs)
         yield from pbar
         if not quiet:
             pbar.bar_format = '{desc}: [{elapsed}] [{n_fmt}it] [{rate_fmt}]'
@@ -126,7 +130,11 @@ class Logger:
                 kwargs['leave'] = False
         if 'smoothing' not in kwargs:
             kwargs['smoothing'] = 0. # disable smoothing by default; mean over entire life of pbar
-        with tqdm(*args, **kwargs) as pbar:
+        if 'tqdm' in kwargs:
+            this_tqdm = kwargs.pop('tqdm')
+        else:
+            this_tqdm = tqdm
+        with this_tqdm(*args, **kwargs) as pbar:
             yield pbar
             if not quiet:
                 pbar.bar_format = '{desc}: [{elapsed}] [{n_fmt}it] [{rate_fmt}]'
