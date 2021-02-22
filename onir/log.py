@@ -1,4 +1,5 @@
 import sys
+import os
 import logging
 import operator
 from contextlib import contextmanager
@@ -87,7 +88,9 @@ class Logger:
         level = kwargs.pop('level', 'DEBUG')
         quiet = kwargs.pop('quiet', False)
         if 'ncols' not in kwargs:
-            kwargs['ncols'] = 80
+            cols = os.environ.get('ONIR_PBAR_COLS', '80')
+            if cols:
+                kwargs['ncols'] = int(cols)
         if 'desc' in kwargs:
             if not quiet:
                 self.log(level, '[starting] {desc}'.format(**kwargs))
@@ -122,7 +125,9 @@ class Logger:
             else:
                 raise ValueError('total_from does not have __len__ or __length_hint__')
         if 'ncols' not in kwargs:
-            kwargs['ncols'] = 80
+            cols = os.environ.get('ONIR_PBAR_COLS', '80')
+            if cols:
+                kwargs['ncols'] = int(cols)
         if 'desc' in kwargs:
             if not quiet:
                 self.log(level, '[starting] {desc}'.format(**kwargs))
