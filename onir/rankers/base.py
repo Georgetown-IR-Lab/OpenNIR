@@ -65,4 +65,4 @@ class Ranker(nn.Module):
         torch.save(state, path)
 
     def load(self, path):
-        self.load_state_dict(torch.load(path), strict=False)
+        self.load_state_dict(torch.load(path), strict=False, map_location=torch.device('cpu'))
