@@ -50,7 +50,7 @@ def _parse_args(arg_iter, cd=None):
             while path.is_dir():
                 path = path / '_dir'
             if not path.exists():
-                print(f'configuraiton file not found: {path}')
+                print(f'config file not found: {path}')
             else:
                 with open(path, 'rt') as f:
                     yield from _parse_args(shlex.split(f.read()), path.parent)
