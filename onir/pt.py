@@ -143,9 +143,9 @@ class PtPairTrainer(PtPairTrainerBase):
 
 
 class PtTopicQrelsTrainer(PtPairTrainerBase):
-    def __init__(self, pt_transformer, tr_topics, tr_qrels, tr_run, config):
+    def __init__(self, pt_transformer, tr_run, tr_qrels, config):
         super().__init__(pt_transformer, config)
-        self.topic_lookup = {t.qid: t.query for t in tr_topics.itertuples()}
+        self.topic_lookup = {t.qid: t.query for t in tr_run.itertuples()}
         self.doc_lookup = {t.docno: t.text for t in tr_run.itertuples()}
         self.tr_qrels = tr_qrels.rename(columns={'docno': 'did', 'label': 'score'})
         self.tr_run = tr_run.rename(columns={'docno': 'did'})
@@ -202,7 +202,7 @@ class PtTopicQrelsTrainer(PtPairTrainerBase):
 
 
 
-class OpenNIRPyterrierReRanker(pyterrier.transformer.TransformerBase):
+class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
     """
     Provides an interface for OpenNIR-style ranking models to act
     as re-rankers in pyterrier pipelines.
@@ -272,21 +272,21 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.TransformerBase):
         return dataframe
 
     def fit(self,
-            tr_topics=None,
-            tr_qrels=None,
-            tr_run=None,
-            tr_pairs=None,
-            va_run=None,
-            va_qrels=None) -> pd.DataFrame:
+            tr_run: pd.DataFrame = None,
+            tr_qrels: pd.DataFrame = None,
+            va_run: pd.DataFrame = None,
+            va_qrels: pd.DataFrame = None,
+            *,
+            tr_pairs: pd.DataFrame = None) -> pd.DataFrame:
         if tr_pairs is not None:
-            assert tr_topics is None and tr_qrels is None, "tr_topics and tr_qrels shouldn't be provided if tr_pairs is given"
+            assert tr_run is None and tr_qrels is None, "tr_run and tr_qrels shouldn't be provided if tr_pairs is given"
             trainer = PtPairTrainer(self, tr_pairs, self.config)
-        elif tr_topics is not None and tr_qrels is not None:
-            trainer = PtTopicQrelsTrainer(self, tr_topics, tr_qrels, tr_run, self.config)
+        elif tr_run is not None and tr_qrels is not None:
+            trainer = PtTopicQrelsTrainer(self, tr_run, tr_qrels, self.config)
         else:
-            raise RuntimeError('Must provide either tr_pairs or (tr_topics and tr_qrels)')
+            raise RuntimeError('Must provide either tr_pairs or (tr_run and tr_qrels)')
         if va_run is None and va_qrels is None:
-            validator = None # No validation -- just do a single stage of ranking
+            validator = None # No validation -- just do a single stage of training
         elif va_run is not None and va_qrels is not None:
             validator = PtValidator(self, va_run, va_qrels, self.config)
         else:
@@ -467,39 +467,3 @@ reranker = OpenNIRPyterrierReRanker
 
 # column definitions for training with tr_pairs
 TrainPair = namedtuple('TrainPair', ['qid', 'query', 'docno_pos', 'text_pos', 'docno_neg', 'text_neg'])
-
-
-if __name__ == '__main__':
-    # rr = reranker('knrm', 'wordvec')
-    # rr = reranker.from_checkpoint('test.tar.gz')
-    rr = reranker.from_checkpoint('epic.msmarco.tar.gz', {'learning_rate': 1e-5})
-    df = pd.DataFrame([
-        {"qid": '1', 'docno': '1', 'query': 'the quick brown fox', 'text': 'the quick brown fox jumps over the lazy dog'},
-        {"qid": '1', 'docno': '2', 'query': 'the quick brown fox', 'text': 'the brown fox jumps over the lazy dog'},
-        {"qid": '1', 'docno': '3', 'query': 'the quick brown fox', 'text': 'the quick fox jumps over the lazy dog'},
-        {"qid": '1', 'docno': '4', 'query': 'the quick brown fox', 'text': 'the quick brown jumps over the lazy dog'},
-        {"qid": '1', 'docno': '5', 'query': 'the quick brown fox', 'text': 'quick brown fox jumps over the lazy dog'},
-        {"qid": '1', 'docno': '6', 'query': 'the quick brown fox', 'text': 'the quick brown fox'},
-        {"qid": '1', 'docno': '7', 'query': 'the quick brown fox', 'text': 'over lazy the dog jumps the fox quick brown'},
-        {"qid": '1', 'docno': '8', 'query': 'the quick brown fox', 'text': 'the quick brown fox jumps over lazy dog'},
-        {"qid": '1', 'docno': '9', 'query': 'the quick brown fox', 'text': 'the quick brown fox jumps'},
-        {"qid": '1', 'docno': '1', 'query': 'the quick brown fox', 'text': 'the quick brown fox jumps over the lazy dog'},
-    ])
-    result = rr.transform(df)
-    # rr.to_checkpoint('test.tar.gz')
-    def tr_pairs():
-        import ir_datasets
-        ds = ir_datasets.load('msmarco-passage/train')
-        queries = {q.query_id: q for q in ds.queries_iter()}
-        docstore = ds.docs_store()
-        for scoreddoc in ds.docpairs_iter():
-            yield TrainPair(
-                scoreddoc.query_id,
-                queries[scoreddoc.query_id].text,
-                scoreddoc.doc_id_a,
-                docstore.get(scoreddoc.doc_id_a).text,
-                scoreddoc.doc_id_b,
-                docstore.get(scoreddoc.doc_id_b).text)
-    fit_result = rr.fit(tr_pairs=tr_pairs())
-    import pdb; pdb.set_trace()
-    pass
