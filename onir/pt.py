@@ -1,3 +1,5 @@
+import os
+import hashlib
 import math
 import io
 import tempfile
@@ -403,7 +405,7 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             tarf.addfile(record, data)
 
     @staticmethod
-    def from_checkpoint(checkpoint_file: str, config: dict = None):
+    def from_checkpoint(checkpoint_file: str, config: dict = None, expected_md5: str = None):
         # A checkpoint file is a .tar.gz file that contains the following:
         #  - vocab.json  (config file including key '' that indicates the name)
         #  - ranker.json  (config file including key '' that indicates the name)
@@ -411,6 +413,16 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
         #  - weights.p   (pytorch weights for the trained model)
         # TODO: make a utility that automatically builds such a file from ONIR runs
         ranker_config, vocab_config, weights = None, None, None
+        if checkpoint_file.startswith('http://') or checkpoint_file.startswith('https://'):
+            # Download
+            output_path = os.path.join(onir.util.get_working(), 'model_checkpoints')
+            os.makedirs(output_path, exist_ok=True)
+            output_path = os.path.join(output_path, hashlib.md5(checkpoint_file.encode()).hexdigest())
+            if not os.path.exists(output_path):
+                onir.util.download(checkpoint_file, output_path, expected_md5=expected_md5)
+            else:
+                _logger.info(f'using cached checkpoint: {output_path}')
+            checkpoint_file = output_path
         with tarfile.open(checkpoint_file, 'r') as tarf:
             # TODO: support URLS
             for record in tarf:
