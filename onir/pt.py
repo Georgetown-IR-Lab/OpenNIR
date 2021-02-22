@@ -329,6 +329,7 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                     _logger.info(f'early stopping; model reverting back to it={best_it}')
                     self.ranker.load(f'{tmpdir}/best-model.pt')
                     break
+                train_it += 1
         return pd.DataFrame(output)
 
     def _iter_batches(self, dataframe, device):
