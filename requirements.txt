@@ -16,6 +16,7 @@ python-ternary>=1.0.6
 
 # parsing
 beautifulsoup4>=4.4.1
+html5lib>=1.0.1
 Unidecode>=1.0.22
 nltk>=3.4.5
 
