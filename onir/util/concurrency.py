@@ -56,8 +56,7 @@ def _blocking_tee_iter(ctrl, ev_available):
                 raise ctrl.ex
         value = ctrl.value
         ctrl.notify_grabbed()
-        if value is not StopIteration:
-            yield value
+        yield value
 
 
 class _BlockingTeeControllerThread(Thread):
