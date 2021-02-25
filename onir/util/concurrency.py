@@ -50,11 +50,13 @@ def _blocking_tee_iter(ctrl, ev_available):
         ev_available.wait()
         ev_available.clear()
         if ctrl.ex:
-            raise ctrl.ex
+            if isinstance(ctrl.ex, StopIteration):
+                break
+            else:
+                raise ctrl.ex
         value = ctrl.value
         ctrl.notify_grabbed()
-        if value is not StopIteration:
-            yield value
+        yield value
 
 
 class _BlockingTeeControllerThread(Thread):
