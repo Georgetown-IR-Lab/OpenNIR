@@ -8,3 +8,4 @@ from onir.vocab.base import Vocab, VocabEncoder
 from onir.vocab.trivial_vocab import TrivialVocab
 from onir.vocab.bert_vocab import BertVocab
 from onir.vocab.wordvec_vocab import WordvecVocab, WordvecUnkVocab, WordvecHashVocab
+from onir.vocab.prettr_bert_vocab import PrettrBertVocab
