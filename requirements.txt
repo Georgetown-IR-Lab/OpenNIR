@@ -26,6 +26,7 @@ git+https://github.com/cvangysel/pytrec_eval.git
 gensim==3.7.3
 Cython==0.29.2
 pyjnius==1.2.1
+ir_datasets>=0.2.0
 
 # misc
 pytools==2018.5.2
