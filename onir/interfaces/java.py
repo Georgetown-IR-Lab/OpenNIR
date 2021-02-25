@@ -31,6 +31,9 @@ class _JavaInterface:
                 else:
                     self._defs[n] = path
 
+    def locate_anserini_jar(self):
+        return os.path.join(os.path.dirname(__file__), os.pardir, 'resources', 'anserini-0.8.0-fatjar.jar')
+
     def add_log_listener(self, func):
         self._log_listeners.insert(0, func)
 

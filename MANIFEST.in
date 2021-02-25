@@ -1,0 +1,3 @@
+include onir/resources/*.jar
+include onir/resources/*.pl
+include onir/resources/trec_eval

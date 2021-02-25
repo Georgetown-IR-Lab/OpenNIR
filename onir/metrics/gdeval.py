@@ -1,3 +1,4 @@
+import os
 import subprocess
 from onir import metrics as _metrics
 
@@ -32,7 +33,7 @@ class GdevalMetrics(_metrics.BaseMetrics):
         Runs gdeval.pl on the given run/qrels pair
         """
         # adapted from searchivarius/AccurateLuceneBM25/scripts/eval_output_gdeval.py
-        perlf = 'bin/gdeval.pl' # TODO: ensure correct path by building based on module path?
+        perlf = os.path.join(os.path.dirname(__file__), os.pardir, 'resources', 'gdeval.pl')
         output = subprocess.check_output([perlf, qrelsf, runf, str(cutoff)])
         output = output.decode().replace('\t', ' ').split('\n')
         result = {'ndcg': {}, 'err': {}}

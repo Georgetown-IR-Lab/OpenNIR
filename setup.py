@@ -15,6 +15,7 @@ setup(
     long_description_content_type='text/markdown',
     version='0.1.0',
     packages=find_packages(exclude=['test']),
+    include_package_data=True,
     url="http://opennir.net/",
     project_urls={
         "Documentation": "http://opennir.net/",
