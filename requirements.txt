@@ -20,7 +20,7 @@ Unidecode==1.0.22
 nltk==3.4.5
 
 # interfacing
-git+https://github.com/TREMA-UNH/trec-car-tools.git#subdirectory=python3
+trec-car-tools>=2.5.3
 sqlitedict==1.6.0
 git+https://github.com/cvangysel/pytrec_eval.git
 gensim==3.7.3
