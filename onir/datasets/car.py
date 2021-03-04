@@ -140,7 +140,7 @@ http://trec-car.cs.unh.edu/"""
 
     def _init_doc_iter(self):
         with util.download_tmp(_SOURCES['corpus'], tarf=True) as f:
-            cbor_file = f.extract('paragraphcorpus/paragraphcorpus.cbor')
+            cbor_file = f.extractfile('paragraphcorpus/paragraphcorpus.cbor')
             for did, text in self.logger.pbar(car.iter_paras(cbor_file), desc='documents'):
                 yield indices.RawDoc(did, text)
 
