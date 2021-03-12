@@ -1,3 +1,4 @@
+import sys
 import os
 import hashlib
 import math
@@ -7,10 +8,17 @@ import inspect
 import torch
 import json
 import tarfile
-from collections import namedtuple
-from typing import Union
+import transformers
+from pathlib import Path
+from collections import namedtuple, Counter, OrderedDict
+from typing import Union, Dict, Tuple
 import pandas as pd
 import numpy as np
+
+# should come before importing onir
+os.environ['ONIR_IGNORE_ARGV'] = 'true' # don't process command line arguments (they come from jupyter)
+os.environ['ONIR_PBAR_COLS'] = '' # no ncols for tqdm
+
 import pyterrier
 import onir
 
@@ -200,10 +208,6 @@ class PtTopicQrelsTrainer(PtPairTrainerBase):
 
 
 
-
-
-
-
 class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
     """
     Provides an interface for OpenNIR-style ranking models to act
@@ -259,6 +263,9 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             self.config.update(config)
 
     def transform(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        """
+        Scores query-document pairs using this model.
+        """
         scores = []
         device = onir.util.device(self.config, _logger)
         with torch.no_grad():
@@ -280,6 +287,9 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             va_qrels: pd.DataFrame = None,
             *,
             tr_pairs: pd.DataFrame = None) -> pd.DataFrame:
+        """
+        Trains this model on either pairs generated from tr_run and tr_qrels or explicitly provided with tr_pairs.
+        """
         if tr_pairs is not None:
             assert tr_run is None and tr_qrels is None, "tr_run and tr_qrels shouldn't be provided if tr_pairs is given"
             trainer = PtPairTrainer(self, tr_pairs, self.config)
@@ -332,29 +342,58 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                 train_it += 1
         return pd.DataFrame(output)
 
-    def _iter_batches(self, dataframe, device):
+    def explain_diffir(self, dataframe: pd.DataFrame, output_field='text') -> Dict[str, Dict[str, Dict[str, Tuple[int, int, float]]]]:
+        """
+        Produces a diffir weights object for each query/doc in the given dataframe.
+        When saved as JSON, this object is suitable for highlighting functionality in
+        the diffir tool <https://github.com/capreolus-ir/diffir>.
+
+        Not supported by all models.
+        """
+        assert hasattr(self.ranker, 'explain_diffir'), f"model {self.ranker} does not support explain_diffir"
+        ranker = self.ranker.to(onir.util.device(self.config, _logger)).eval()
+
+        result = {}
+        for rec in _logger.pbar(dataframe.itertuples(), total=len(dataframe)):
+            weights = ranker.explain_diffir(rec.query, rec.text)
+            result.setdefault(rec.qid, {})[rec.docno] = {output_field: weights}
+        return result
+
+    def _iter_batches(self, dataframe, device, fields=None, skip_empty_docs=False):
         batch_size = self.config['batch_size']
         input_spec = self.ranker.input_spec()
-        fields = input_spec['fields']
+        if fields is None:
+            fields = input_spec['fields']
         batch = {f: [] for f in fields}
         batch_count = 0
         last_qid = None
-        for rec in dataframe.itertuples():
-            if rec.qid != last_qid:
-                query_text = self.vocab.tokenize(rec.query)
-                query_tok = [self.vocab.tok2id(t) for t in query_text]
-                last_qid = rec.qid
-            doc_text = self.vocab.tokenize(rec.text)
-            doc_tok = [self.vocab.tok2id(t) for t in doc_text]
+        # support either df or iter[dict]s
+        if isinstance(dataframe, pd.DataFrame):
+            dataframe = [rec._asdict() for rec in dataframe.itertuples()]
+        for rec in dataframe:
+            if 'qid' in rec:
+                if rec['qid'] != last_qid:
+                    query_text = self.vocab.tokenize(rec['query'])
+                    query_tok = [self.vocab.tok2id(t) for t in query_text]
+                    last_qid = rec['qid']
+            else:
+                query_text, query_tok = None, None
+            if 'text' in rec:
+                doc_text = self.vocab.tokenize(rec['text'])
+                doc_tok = [self.vocab.tok2id(t) for t in doc_text]
+                if skip_empty_docs and len(doc_tok) == 0:
+                    continue
+            else:
+                doc_text, doc_tok = None, None
             for f in fields:
                 if f == 'doc_id':
-                    batch[f].append(rec.docno)
+                    batch[f].append(rec['docno'])
                 elif f == 'query_id':
-                    batch[f].append(rec.qid)
+                    batch[f].append(rec['qid'])
                 elif f == 'query_rawtext':
-                    batch[f].append(rec.query)
+                    batch[f].append(rec['query'])
                 elif f == 'doc_rawtext':
-                    batch[f].append(rec.text)
+                    batch[f].append(rec['text'])
                 elif f == 'query_text':
                     batch[f].append(query_text)
                 elif f == 'doc_text':
@@ -378,6 +417,9 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             yield batch_count, onir.spec.apply_spec_batch(batch, input_spec, device)
 
     def to_checkpoint(self, checkpoint_file: str):
+        """
+        Saves this model as a checkpoint that can be loaded with .from_checkpoint()
+        """
         with tarfile.open(checkpoint_file, 'w:gz') as tarf:
             record = tarfile.TarInfo('ranker.json')
             data = dict(self.ranker.config)
@@ -405,8 +447,12 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             data.seek(0)
             tarf.addfile(record, data)
 
-    @staticmethod
-    def from_checkpoint(checkpoint_file: str, config: dict = None, expected_md5: str = None):
+    @classmethod
+    def from_checkpoint(cls, checkpoint_file: str, config: dict = None, expected_md5: str = None, **kwargs):
+        """
+        Loads a reranker object from a checkpoint file. checkpoint_file can either be a file path
+        on the filesystem, or a URL to download (optionally verified with expected_md5).
+        """
         # A checkpoint file is a .tar.gz file that contains the following:
         #  - vocab.json  (config file including key '' that indicates the name)
         #  - ranker.json  (config file including key '' that indicates the name)
@@ -451,7 +497,13 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             vocab_name = vocab_config['']
             del ranker_config['']
             del vocab_config['']
-            return OpenNIRPyterrierReRanker(ranker_name, vocab_name, ranker_config, vocab_config, weights, config=config)
+            return cls(ranker_name, vocab_name, ranker_config, vocab_config, weights, config=config, **kwargs)
+
+    def __repr__(self):
+        return f'onir({self.ranker.name},{self.vocab.name})'
+
+    def __str__(self):
+        return repr(self)
 
 
 def _inject(cls, context={}):
@@ -474,8 +526,172 @@ def _inject(cls, context={}):
     return cls(*args)
 
 
-# an easier-to-remember alias: onir.pt.reranker
+
+class IndexedEpic(OpenNIRPyterrierReRanker):
+    """
+    Provides an interface for a building a direct index for an EPIC model.
+    """
+    def __init__(self, *args, index_path=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert self.ranker.name == 'epic'
+        self.index_path = Path(index_path)
+        if 'epic_prune' not in self.config:
+            self.config['epic_prune'] = 1000 # default pruning value
+
+    def fit(self, docs_iter, fields=('text',)):
+        return self.index(docs_iter, fields)
+
+    def index(self, docs_iter, fields=('text',), replace=False):
+        assert self.index_path is not None, "you must supply index_path to run .index()"
+        if not replace:
+            assert not (self.index_path / '_built').exists(), "index already built (use replace=True to replace)"
+        else:
+            if (self.index_path / '_built').exists():
+                (self.index_path / '_built').unlink()
+        self.index_path.mkdir(parents=True, exist_ok=True)
+        PRUNE = self.config['epic_prune']
+        LEX_SIZE = self.vocab.lexicon_size()
+        with (self.index_path / 'data').open('wb') as out_data, \
+             (self.index_path / 'dids').open('wt') as out_dids:
+            for did, vec in self._iter_docvecs(docs_iter, fields):
+                vec = vec.half().cpu().numpy()
+                idxs = np.argpartition(vec, LEX_SIZE - PRUNE)[-PRUNE:].astype(np.int16)
+                idxs.sort()
+                vals = vec[idxs]
+                out_data.write(idxs.tobytes())
+                out_data.write(vals.tobytes())
+                out_dids.write(f'{did}\n')
+        (self.index_path / '_built').touch()
+        return self
+
+    def _iter_docvecs(self, docs_iter, fields):
+        device = onir.util.device(self.config, _logger)
+        def transform_doc(doc):
+            doc['text'] = ' '.join(doc[f] for f in fields)
+            return doc
+        docs_iter = map(transform_doc, docs_iter)
+        with torch.no_grad():
+            ranker = self.ranker.to(device).eval()
+            doc_fields = {f for f in self.ranker.input_spec()['fields'] if f.startswith('doc_')} | {'doc_id'}
+            batches = self._iter_batches(docs_iter, device, doc_fields, skip_empty_docs=True)
+            for count, batch in batches:
+                doc_vectors = ranker.doc_vectors(dense=True, **batch)
+                yield from zip(batch['doc_id'], doc_vectors)
+
+    def reranker(self) -> 'EpicIndexedReRanker':
+        """
+        Returns an EpicIndexedReRanker for this (built) index, which can be used to score documents.
+        """
+        assert (self.index_path / '_built').exists(), "index does not exist; use .index(docs_iter) to build index"
+        return EpicIndexedReRanker(ranker=self.ranker, vocab=self.vocab, config=self.config, index_path=self.index_path)
+
+    def doc_vectors(self, doc_ids: Union[str, list]) -> Dict[str, Dict[str, float]]:
+        """
+        Looks up pre-computed EPIC document vectors for the provided document ID(s).
+        """
+        doc_ids = [doc_ids] if isinstance(doc_ids, str) else list(doc_ids)
+
+        result = {}
+
+        for did, (tids, vals) in zip(doc_ids, self.reranker()._iter_docs_from_index(doc_ids)):
+            result = Counter()
+            for tid, val in zip(tids, vals):
+                result[self.vocab.id2tok(tid)] = val
+            result[did] = OrderedDict(result.most_common())
+        return result
+
+
+_msg_text_shown = False
+_msg_latency_shown = False
+
+class EpicIndexedReRanker(OpenNIRPyterrierReRanker):
+    """
+    Provides an interface for using a direct index from an EPIC model to score documents.
+    """
+    def __init__(self, *args, index_path=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert self.ranker.name == 'epic'
+        self.index_path = Path(index_path)
+
+    def fit(self, *args, **kwargs):
+        raise NotImplementedError('fit not supported for indexed EPIC reranker')
+
+
+    def transform(self, dataframe: pd.DataFrame = None) -> pd.DataFrame:
+        global _msg_text_shown
+        global _msg_latency_shown
+        # TODO: only show these messages once?
+        if not _msg_text_shown:
+            if 'text' in dataframe:
+                _logger.info("text field spotted in dataframe; you don't need this when using epic from indexed docs. (This message is only shown once.)")
+                _msg_text_shown = True
+        if not _msg_latency_shown:
+            _logger.info("This EPIC transformer shouldn't be used to calculate query latency. It computes "
+                         "query vectors batches (rather than individually), and doesn't do this work in parallel "
+                         "with first-stage retrieval. For thise operations, use the epic pipeline in OpenNIR. "
+                         "(This message is only shown once.)")
+            _msg_latency_shown = True
+
+        def query_data_iter(df):
+            prev_qid = None
+            for rec in df.itertuples():
+                if rec.qid != prev_qid:
+                    yield {'qid': rec.qid, 'query': rec.query}
+                    prev_qid = rec.qid
+        qvec_iter = self._iter_qvecs(query_data_iter(dataframe))
+        this_qid, this_qvec = next(qvec_iter)
+
+        LEXICON_SIZE = self.vocab.lexicon_size()
+
+        doc_iter = self._iter_docs_from_index(d.docno for d in dataframe.itertuples())
+        
+        scores = []
+        with open(os.path.join(self.index_path, 'data'), 'rb') as fdata:
+            # TODO: optmize order that the index is traversed
+            for rec, (tids, vals) in _logger.pbar(zip(dataframe.itertuples(), doc_iter), desc='records', tqdm=pyterrier.tqdm, total=len(dataframe)):
+                while rec.qid != this_qid: # should only ever be 0 or 1 iteration
+                    this_qid, this_qvec = next(qvec_iter)
+                    this_qvec = this_qvec.cpu()
+                tids = torch.from_numpy(tids)
+                vals = torch.from_numpy(vals)
+                dvec = torch.sparse.FloatTensor(torch.stack([torch.zeros_like(tids), tids]).long(), vals.float(), torch.Size([1, LEXICON_SIZE]))
+                score = (this_qvec.cpu() * dvec[0]).values().sum().item()
+                scores.append(score)
+        dataframe['score'] = scores
+        return dataframe
+
+    def _iter_qvecs(self, query_iter):
+        device = onir.util.device(self.config, _logger)
+        with torch.no_grad():
+            ranker = self.ranker.to(device).eval()
+            query_fields = {f for f in self.ranker.input_spec()['fields'] if f.startswith('query_')} | {'query_id'}
+            batches = self._iter_batches(query_iter, device, query_fields)
+            for count, batch in batches:
+                query_vectors = ranker.query_vectors(dense=True, **batch) # bad arg name, not actually dense, just a tensor (rather than dict)
+                yield from zip(batch['query_id'], query_vectors)
+
+    def _iter_docs_from_index(self, did_iter):
+        DTYPE_S = 2 # all values are 2-byte (int16 and f2)
+        PRUNE = self.config['epic_prune']
+        REC_SIZE = PRUNE * DTYPE_S * 2 # pos + vals
+
+        # TODO: cache did2idx
+        did2idx = {did.strip(): i for i, did in enumerate((self.index_path / 'dids').open('rt'))}
+
+        with (self.index_path / 'data').open('rb') as fdata:
+            for did in did_iter:
+                assert did in did2idx, f"docno {did} not found in index"
+                idx = did2idx[did]
+                fdata.seek(REC_SIZE * idx)
+                data = fdata.read(REC_SIZE)
+                tids = np.frombuffer(data[:REC_SIZE//2], dtype=np.int16)
+                vals = np.frombuffer(data[REC_SIZE//2:], dtype='f2')
+                yield tids, vals
+
+
+# easier-to-remember aliases: onir.pt.reranker and onir.pt.indexed_epic
 reranker = OpenNIRPyterrierReRanker
+indexed_epic = IndexedEpic
 
 
 # column definitions for training with tr_pairs
