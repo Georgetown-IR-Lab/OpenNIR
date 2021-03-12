@@ -21,8 +21,7 @@ setup(
         "Documentation": "http://opennir.net/",
         "Source": "https://github.com/Georgetown-IR-Lab/OpenNIR"
     },
-    install_requires=[
-    ],
+    install_requires=[l for l in open('requirements.txt') if not l.startswith('#') and not l.startswith('git+') and l.strip() != ''],
     entry_points={
         "console_scripts": [
             "onir_init_dataset=onir.bin.init_dataset:main",

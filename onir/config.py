@@ -17,7 +17,8 @@ def logger():
 def args():
     result = {
         # runid for logging, etc.
-        'runid': datetime.now().strftime(f'%Y%m%dT%H%M%S-{random.randint(1000, 9999)}')
+        'runid': datetime.now().strftime(f'%Y%m%dT%H%M%S-{random.randint(1000, 9999)}'),
+        'data_dir': '~/data/onir/'
     }
 
     # default configuration
@@ -49,9 +50,10 @@ def _parse_args(arg_iter, cd=None):
             while path.is_dir():
                 path = path / '_dir'
             if not path.exists():
-                raise FileNotFoundError(f'configuraiton file not found: {path}')
-            with open(path, 'rt') as f:
-                yield from _parse_args(shlex.split(f.read()), path.parent)
+                print(f'config file not found: {path}')
+            else:
+                with open(path, 'rt') as f:
+                    yield from _parse_args(shlex.split(f.read()), path.parent)
 
 
 def apply_config(name, args, cls):
@@ -59,7 +61,7 @@ def apply_config(name, args, cls):
     for key, value in cls.default_config().items():
         if not isinstance(value, ConfigValue):
             value = TypeConstraint(type(value), value)
-        arg_key = f'{name}.{key}'
+        arg_key = f'{name}.{key}' if name is not None else key
         if arg_key in args:
             value.override_value(args[arg_key])
         result[key] = value.realize()

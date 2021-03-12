@@ -83,14 +83,15 @@ class EpicRanker(rankers.Ranker):
                     result[-1][self.vocab.id2tok(qtok.item())] = qsal
         return result
 
-    def doc_full_vector(self, doc_tok_reps, doc_len, doc_cls):
+    def doc_full_vector(self, doc_tok_reps, doc_len, doc_cls, reduce=True):
         tok_salience = self.doc_salience(self.dropout(doc_tok_reps))
         tok_salience = self.activ(tok_salience)
         exp_raw = self.encoder.bert.cls.predictions(doc_tok_reps)
         mask = util.lens2mask(doc_len, exp_raw.shape[1])
         exp = self.activ(exp_raw)
         exp = exp * tok_salience * mask.unsqueeze(2).float()
-        exp, _ = exp.max(dim=1)
+        if reduce:
+            exp, _ = exp.max(dim=1)
         qlty = torch.sigmoid(self.doc_quality(doc_cls))
         exp = qlty * exp
         qlty = qlty.reshape(doc_cls.shape[0])
@@ -121,3 +122,23 @@ class EpicRanker(rankers.Ranker):
 
     def similarity_inference(self, query_vecs, doc_vecs):
         return torch.sparse.mm(doc_vecs, query_vecs.to_dense().transpose(1, 0)).squeeze(1)
+
+    def explain_diffir(self, query_text, doc_text):
+        device = self._nil.device
+        inputs = {
+            'query_tok': torch.tensor([[self.vocab.tok2id(t) for t in self.vocab.tokenize(query_text)]]).to(device)[:, :self.config['qlen']],
+            'doc_tok': torch.tensor([[self.vocab.tok2id(t) for t in self.vocab.tokenize(doc_text)]]).to(device)[:, :self.config['dlen']],
+        }
+        doc_rngs = self.vocab.char_ranges(doc_text)
+        inputs.update({
+            'query_len': torch.tensor([inputs['query_tok'].shape[1]]).to(device),
+            'doc_len': torch.tensor([inputs['doc_tok'].shape[1]]).to(device),
+        })
+        encoded = self.encoder.enc_query_doc(**inputs)
+        query_vecs = self.query_full_vector(encoded['query'], inputs['query_len'], inputs['query_tok'])
+        doc_vecs, _ = self.doc_full_vector(encoded['doc'], inputs['doc_len'], encoded['doc_cls'], reduce=False)
+        vals_by_d_term = (query_vecs.unsqueeze(1) * doc_vecs).max(dim=2).values.cpu()
+        result = []
+        for rng, val in zip(doc_rngs, vals_by_d_term[0]):
+            result.append([rng[0], rng[1], val.item()])
+        return result

@@ -1,4 +1,5 @@
 import sys
+import os
 import logging
 import operator
 from contextlib import contextmanager
@@ -87,7 +88,9 @@ class Logger:
         level = kwargs.pop('level', 'DEBUG')
         quiet = kwargs.pop('quiet', False)
         if 'ncols' not in kwargs:
-            kwargs['ncols'] = 80
+            cols = os.environ.get('ONIR_PBAR_COLS', '80')
+            if cols:
+                kwargs['ncols'] = int(cols)
         if 'desc' in kwargs:
             if not quiet:
                 self.log(level, '[starting] {desc}'.format(**kwargs))
@@ -99,7 +102,11 @@ class Logger:
             kwargs['total'] = operator.length_hint(it)
         if 'smoothing' not in kwargs:
             kwargs['smoothing'] = 0. # disable smoothing by default; mean over entire life of pbar
-        pbar = tqdm(it, *args, **kwargs)
+        if 'tqdm' in kwargs:
+            this_tqdm = kwargs.pop('tqdm')
+        else:
+            this_tqdm = tqdm
+        pbar = this_tqdm(it, *args, **kwargs)
         yield from pbar
         if not quiet:
             pbar.bar_format = '{desc}: [{elapsed}] [{n_fmt}it] [{rate_fmt}]'
@@ -118,7 +125,9 @@ class Logger:
             else:
                 raise ValueError('total_from does not have __len__ or __length_hint__')
         if 'ncols' not in kwargs:
-            kwargs['ncols'] = 80
+            cols = os.environ.get('ONIR_PBAR_COLS', '80')
+            if cols:
+                kwargs['ncols'] = int(cols)
         if 'desc' in kwargs:
             if not quiet:
                 self.log(level, '[starting] {desc}'.format(**kwargs))
@@ -126,7 +135,11 @@ class Logger:
                 kwargs['leave'] = False
         if 'smoothing' not in kwargs:
             kwargs['smoothing'] = 0. # disable smoothing by default; mean over entire life of pbar
-        with tqdm(*args, **kwargs) as pbar:
+        if 'tqdm' in kwargs:
+            this_tqdm = kwargs.pop('tqdm')
+        else:
+            this_tqdm = tqdm
+        with this_tqdm(*args, **kwargs) as pbar:
             yield pbar
             if not quiet:
                 pbar.bar_format = '{desc}: [{elapsed}] [{n_fmt}it] [{rate_fmt}]'
