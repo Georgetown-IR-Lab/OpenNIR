@@ -1,3 +1,4 @@
+import os
 import re
 import subprocess
 import tempfile
@@ -104,7 +105,7 @@ class TrecEvalMetrics(_metrics.BaseMetrics):
         """
         Runs trec_eval on the given run/qrels pair
         """
-        trec_eval_f = 'bin/trec_eval' # TODO: ensure correct path by building based on module path?
+        trec_eval_f = os.path.join(os.path.dirname(__file__), os.pardir, 'resources', 'trec_eval')
         args = [trec_eval_f, '-q', '-c', '-n']
         if rel_level is not None:
             args.append(f'-l{rel_level}')
