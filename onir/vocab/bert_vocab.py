@@ -35,6 +35,9 @@ class BertVocab(vocab.Vocab):
         # return self.tokenizer.tokenize(text)
         return self.tokenizer.encode(text).tokens[1:-1] # removes leading [CLS] and trailing [SEP]
 
+    def char_ranges(self, text):
+        return self.tokenizer.encode(text).offsets[1:-1]
+
     def tok2id(self, tok):
         # return self.tokenizer.vocab[tok]
         return self.tokenizer.token_to_id(tok)

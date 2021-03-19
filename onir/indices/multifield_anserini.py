@@ -19,7 +19,7 @@ from onir.interfaces.java import J
 logger = onir.log.easy()
 
 
-J.register(jars=["bin/lucene-backward-codecs-8.0.0.jar", "bin/anserini-0.8.0-fatjar.jar"], defs=dict(
+J.register(jars=[J.locate_anserini_jar()], defs=dict(
     # [L]ucene
     L_FSDirectory='org.apache.lucene.store.FSDirectory',
     L_DirectoryReader='org.apache.lucene.index.DirectoryReader',

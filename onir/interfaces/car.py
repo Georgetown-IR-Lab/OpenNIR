@@ -1,9 +1,6 @@
 from onir import util
 
-try:
-    import trec_car.read_data
-except ImportError:
-    print('failed to import trec_car')
+import trec_car.read_data
 
 
 @util.path_to_stream(mode='rb')
