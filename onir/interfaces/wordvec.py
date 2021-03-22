@@ -27,6 +27,7 @@ def zip_handler(url, ext='', expected_md5=None):
                     z.extract(zip_file_name, p)
             with logger.duration(f'loading vecs into memory'):
                 terms = []
+                weights_array = None
                 weights = []
                 with open(out_file_name, 'rt') as f:
                     for line in f:
@@ -38,8 +39,17 @@ def zip_handler(url, ext='', expected_md5=None):
                         else:
                             terms.append(cols[0])
                             weights.append([float(c) for c in cols[1:]])
-                weights = np.array(weights)
-                return terms, weights
+                            if len(weights) > 10_000: # combine every 10k rows into the np array
+                                if weights_array is not None:
+                                    weights_array = np.concatenate((weights_array, weights), axis=0)
+                                else:
+                                    weights_array = np.array(weights)
+                                weights = []
+                if weights_array is not None:
+                    weights_array = np.concatenate((weights_array, weights), axis=0)
+                else:
+                    weights_array = np.array(weights)
+                return terms, weights_array
     return wrapped
 
 
