@@ -46,7 +46,9 @@ class Drmm(rankers.Ranker):
 
     def input_spec(self):
         result = super().input_spec()
-        result['fields'].update({'query_tok', 'doc_tok', 'query_len', 'doc_len', 'query_idf'})
+        result['fields'].update({'query_tok', 'doc_tok', 'query_len', 'doc_len'})
+        if self.config['combine'] == 'idf':
+            result['fields'].add('query_idf')
         result['qlen_mode'] = 'max'
         result['dlen_mode'] = 'max'
         return result
@@ -56,7 +58,7 @@ class Drmm(rankers.Ranker):
         qterm_features = self.histogram_pool(simmat, inputs)
         BAT, QLEN, _ = qterm_features.shape
         qterm_scores = self.hidden_2(torch.relu(self.hidden_1(qterm_features))).reshape(BAT, QLEN)
-        return self.combine(qterm_scores, inputs['query_idf'])
+        return self.combine(qterm_scores, inputs.get('query_idf'))
 
     def histogram_pool(self, simmat, inputs):
         histogram = self.histogram(simmat, inputs['doc_len'], inputs['doc_tok'], inputs['query_tok'])

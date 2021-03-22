@@ -18,7 +18,8 @@ def args():
     result = {
         # runid for logging, etc.
         'runid': datetime.now().strftime(f'%Y%m%dT%H%M%S-{random.randint(1000, 9999)}'),
-        'data_dir': '~/data/onir/'
+        'data_dir': '~/data/onir/',
+        'modelspace': 'default',
     }
 
     # default configuration

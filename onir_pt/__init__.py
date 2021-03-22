@@ -156,7 +156,7 @@ class PtTopicQrelsTrainer(PtPairTrainerBase):
     def __init__(self, pt_transformer, tr_run, tr_qrels, config):
         super().__init__(pt_transformer, config)
         self.topic_lookup = {t.qid: t.query for t in tr_run.itertuples()}
-        self.doc_lookup = {t.docno: t.text for t in tr_run.itertuples()}
+        self.doc_lookup = {t.docno: getattr(t, self.pt_transformer.text_field) for t in tr_run.itertuples()}
         self.tr_qrels = tr_qrels.rename(columns={'docno': 'did', 'label': 'score'})
         self.tr_run = tr_run.rename(columns={'docno': 'did'})
         self.rng = np.random.RandomState(config['random_seed'])
@@ -219,7 +219,8 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
         ranker_config: dict = None,
         vocab_config: dict = None,
         weights: str = None,
-        config: dict = None):
+        config: dict = None,
+        text_field: str = 'text'):
         if vocab is not None:
             if isinstance(vocab, str):
                 vocab = _inject(
@@ -257,6 +258,8 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             'train_pos_minrel': 1,
             'train_unjudged_rel': 0,
         }
+
+        self.text_field = text_field
 
         # apply overrides
         if config is not None:
@@ -335,14 +338,14 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                     # no validation
                     output.append({'it': train_it, 'loss': train_loss})
                     break
-                if best_it - train_it >= self.config['patience']:
+                if train_it - best_it >= self.config['patience']:
                     _logger.info(f'early stopping; model reverting back to it={best_it}')
                     self.ranker.load(f'{tmpdir}/best-model.pt')
                     break
                 train_it += 1
         return pd.DataFrame(output)
 
-    def explain_diffir(self, dataframe: pd.DataFrame, output_field='text') -> Dict[str, Dict[str, Dict[str, Tuple[int, int, float]]]]:
+    def explain_diffir(self, dataframe: pd.DataFrame) -> Dict[str, Dict[str, Dict[str, Tuple[int, int, float]]]]:
         """
         Produces a diffir weights object for each query/doc in the given dataframe.
         When saved as JSON, this object is suitable for highlighting functionality in
@@ -355,8 +358,8 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
 
         result = {}
         for rec in _logger.pbar(dataframe.itertuples(), total=len(dataframe)):
-            weights = ranker.explain_diffir(rec.query, rec.text)
-            result.setdefault(rec.qid, {})[rec.docno] = {output_field: weights}
+            weights = ranker.explain_diffir(rec.query, getattr(rec, self.text_field))
+            result.setdefault(rec.qid, {})[rec.docno] = {self.text_field: weights}
         return result
 
     def _iter_batches(self, dataframe, device, fields=None, skip_empty_docs=False):
@@ -378,8 +381,8 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                     last_qid = rec['qid']
             else:
                 query_text, query_tok = None, None
-            if 'text' in rec:
-                doc_text = self.vocab.tokenize(rec['text'])
+            if self.text_field in rec:
+                doc_text = self.vocab.tokenize(rec[self.text_field])
                 doc_tok = [self.vocab.tok2id(t) for t in doc_text]
                 if skip_empty_docs and len(doc_tok) == 0:
                     continue
@@ -448,7 +451,7 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             tarf.addfile(record, data)
 
     @classmethod
-    def from_checkpoint(cls, checkpoint_file: str, config: dict = None, expected_md5: str = None, **kwargs):
+    def from_checkpoint(cls, checkpoint_file: str, config: dict = None, expected_md5: str = None, text_field: str = 'text', **kwargs):
         """
         Loads a reranker object from a checkpoint file. checkpoint_file can either be a file path
         on the filesystem, or a URL to download (optionally verified with expected_md5).
@@ -497,7 +500,7 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             vocab_name = vocab_config['']
             del ranker_config['']
             del vocab_config['']
-            return cls(ranker_name, vocab_name, ranker_config, vocab_config, weights, config=config, **kwargs)
+            return cls(ranker_name, vocab_name, ranker_config, vocab_config, weights, config=config, text_field=text_field, **kwargs)
 
     def __repr__(self):
         return f'onir({self.ranker.name},{self.vocab.name})'
