@@ -90,7 +90,12 @@ class IrdsDataset(datasets.IndexBackedDataset):
 
         base_path = os.path.join(util.path_dataset(self), sanitize_path(self.config['docs_ds']))
         os.makedirs(base_path, exist_ok=True)
-        self.index = indices.AnseriniIndex(os.path.join(base_path, 'anserini.porter.{docs_index_fields}'.format(**self.config)), stemmer='porter')
+        real_anserini_path = os.path.join(base_path, 'anserini.porter.{docs_index_fields}'.format(**self.config))
+        os.makedirs(real_anserini_path, exist_ok=True)
+        virtual_anserini_path = '{}.{}'.format(real_anserini_path, sanitize_path(config['queries_ds']))
+        if not os.path.exists(virtual_anserini_path):
+            os.symlink(real_anserini_path, virtual_anserini_path, target_is_directory=True)
+        self.index = indices.AnseriniIndex(virtual_anserini_path, stemmer='porter')
         self.doc_store = indices.IrdsDocstore(self.docs_ds.docs_store(), config['docs_rerank_fields'])
 
     def _get_docstore(self):
