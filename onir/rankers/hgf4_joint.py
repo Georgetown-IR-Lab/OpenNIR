@@ -11,6 +11,7 @@ class HuggingfaceTransformers4JointRanker(rankers.Ranker):
         result = rankers.Ranker.default_config()
         result.update({
             'model': 'bert-base-uncased', # a model name registered in huggingface transformers
+            'norm': 'none',
             'outputs': 1,
         })
         return result
@@ -40,4 +41,22 @@ class HuggingfaceTransformers4JointRanker(rankers.Ranker):
         model_inputs = self.tokenizer(inputs['query_rawtext'], inputs['doc_rawtext'], padding=True, truncation='only_second', return_tensors='pt')
         model_inputs = {k: v.to(self._nil.device) for k, v in model_inputs.items()}
         result = self.model(**model_inputs).logits
-        return result[:, :self.config['outputs']]
+        if self.config['norm'] == 'none':
+            return result[:, :self.config['outputs']]
+        elif self.config['norm'] == 'softmax':
+            result = F.softmax(result, dim=1)
+            return result[:, 0]
+        elif self.config['norm'] == 'softmax-2':
+            result = F.softmax(result, dim=1)
+            return result[:, 1]
+        raise ValueError('unsupported norm={norm}'.format(**self.config))
+
+    def load_hgf_checkpoint(self, checkpoint_path):
+        with self.logger.duration('loading BERT weights from {}'.format(checkpoint_path)):
+            weights = torch.load(checkpoint_path)
+            if 'classifier.weight' not in weights and 'cls.seq_relationship.weight' in weights:
+                weights['classifier.weight'] = weights['cls.seq_relationship.weight']
+            if 'classifier.bias' not in weights and 'cls.seq_relationship.bias' in weights:
+                weights['classifier.bias'] = weights['cls.seq_relationship.bias']
+            result = self.model.load_state_dict(weights, strict=False)
+        print(result)
