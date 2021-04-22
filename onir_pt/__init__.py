@@ -376,14 +376,20 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
         for rec in dataframe:
             if 'qid' in rec:
                 if rec['qid'] != last_qid:
-                    query_text = self.vocab.tokenize(rec['query'])
-                    query_tok = [self.vocab.tok2id(t) for t in query_text]
+                    if self.vocab:
+                        query_text = self.vocab.tokenize(rec['query'])
+                        query_tok = [self.vocab.tok2id(t) for t in query_text]
+                    else:
+                        query_text, query_tok = None, None
                     last_qid = rec['qid']
             else:
                 query_text, query_tok = None, None
             if self.text_field in rec:
-                doc_text = self.vocab.tokenize(rec[self.text_field])
-                doc_tok = [self.vocab.tok2id(t) for t in doc_text]
+                if self.vocab:
+                    doc_text = self.vocab.tokenize(rec[self.text_field])
+                    doc_tok = [self.vocab.tok2id(t) for t in doc_text]
+                else:
+                    doc_text, doc_tok = None, None
                 if skip_empty_docs and len(doc_tok) == 0:
                     continue
             else:
@@ -431,12 +437,13 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
             record.size = len(data)
             tarf.addfile(record, io.BytesIO(data))
 
-            record = tarfile.TarInfo('vocab.json')
-            data = dict(self.vocab.config)
-            data[''] = self.vocab.name
-            data = json.dumps(data).encode()
-            record.size = len(data)
-            tarf.addfile(record, io.BytesIO(data))
+            if self.vocab:
+                record = tarfile.TarInfo('vocab.json')
+                data = dict(self.vocab.config)
+                data[''] = self.vocab.name
+                data = json.dumps(data).encode()
+                record.size = len(data)
+                tarf.addfile(record, io.BytesIO(data))
 
             record = tarfile.TarInfo('config.json')
             data = json.dumps(self.config).encode()
@@ -492,18 +499,21 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                 else:
                     _logger.warn(f'unexpected file in checkpoint: {record.name}')
             assert ranker_config is not None, "ranker.json missing"
-            assert vocab_config is not None, "vocab.json missing"
             assert weights is not None, "weights.p missing"
             if config is None: # missing config is OK
                 config = {}
             ranker_name = ranker_config['']
-            vocab_name = vocab_config['']
+            vocab_name = vocab_config[''] if vocab_config else None
             del ranker_config['']
-            del vocab_config['']
+            if vocab_config:
+                del vocab_config['']
             return cls(ranker_name, vocab_name, ranker_config, vocab_config, weights, config=config, text_field=text_field, **kwargs)
 
     def __repr__(self):
-        return f'onir({self.ranker.name},{self.vocab.name})'
+        if self.vocab:
+            return f'onir({self.ranker.name},{self.vocab.name})'
+        return f'onir({self.ranker.name})'
+
 
     def __str__(self):
         return repr(self)
