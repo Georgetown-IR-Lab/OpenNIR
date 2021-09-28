@@ -386,7 +386,8 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                 query_text, query_tok = None, None
             if self.text_field in rec:
                 if self.vocab:
-                    doc_text = self.vocab.tokenize(rec[self.text_field])
+                    doc_rawtext = rec[self.text_field]
+                    doc_text = self.vocab.tokenize(doc_rawtext)
                     doc_tok = [self.vocab.tok2id(t) for t in doc_text]
                 else:
                     doc_text, doc_tok = None, None
@@ -402,7 +403,7 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                 elif f == 'query_rawtext':
                     batch[f].append(rec['query'])
                 elif f == 'doc_rawtext':
-                    batch[f].append(rec['text'])
+                    batch[f].append(doc_rawtext)
                 elif f == 'query_text':
                     batch[f].append(query_text)
                 elif f == 'doc_text':
