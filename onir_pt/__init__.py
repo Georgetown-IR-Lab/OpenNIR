@@ -390,6 +390,7 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
                     doc_text = self.vocab.tokenize(doc_rawtext)
                     doc_tok = [self.vocab.tok2id(t) for t in doc_text]
                 else:
+                    doc_rawtext = rec[self.text_field]
                     doc_text, doc_tok = None, None
                 if skip_empty_docs and len(doc_tok) == 0:
                     continue
