@@ -61,6 +61,8 @@ the `ONIR_ARGS` environment variable.
 
 ### Evaluation Metrics
 
+**New: Any measure from the [ir-measures](https://ir-measur.es/) package.**
+
 - `map` (from trec_eval)
 - `ndcg` (from trec_eval)
 - `ndcg@X` (from trec_eval, gdeval)

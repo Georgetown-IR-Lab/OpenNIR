@@ -1,6 +1,7 @@
 from typing import Dict
 from onir.metrics.base import BaseMetrics, Metric
 from onir.metrics.fallback import FallbackMetrics
+from onir.metrics.irm import IrMeasuresMetrics
 from onir.metrics.gdeval import GdevalMetrics
 from onir.metrics.judged import JudgedMetrics
 from onir.metrics.msmarco import MsMarcoMetrics
@@ -9,6 +10,7 @@ from onir.metrics.treceval import TrecEvalMetrics
 
 
 primary = FallbackMetrics([
+    IrMeasuresMetrics(),
     MsMarcoMetrics(),
     PyTrecEvalMetrics(),
     TrecEvalMetrics(),
