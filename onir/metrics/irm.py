@@ -12,6 +12,8 @@ class IrMeasuresMetrics(_metrics.BaseMetrics):
             return True
         except ValueError:
             return False
+        except NameError:
+            return False
 
     def calc_metrics(self, qrels, run, metrics, verbose=False):
         measures = {ir_measures.parse_measure(str(m)): str(m) for m in metrics}
