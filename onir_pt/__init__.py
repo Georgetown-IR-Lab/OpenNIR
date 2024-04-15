@@ -670,7 +670,7 @@ class EpicIndexedReRanker(OpenNIRPyterrierReRanker):
                 tids = torch.from_numpy(tids)
                 vals = torch.from_numpy(vals)
                 dvec = torch.sparse.FloatTensor(torch.stack([torch.zeros_like(tids), tids]).long(), vals.float(), torch.Size([1, LEXICON_SIZE]))
-                score = (this_qvec.cpu() * dvec[0]).values().sum().item()
+                score = (this_qvec.cpu() * dvec[0]).coalesce().values().sum().item()
                 scores.append(score)
         dataframe['score'] = scores
         return dataframe
