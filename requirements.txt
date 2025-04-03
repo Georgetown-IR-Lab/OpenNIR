@@ -25,7 +25,6 @@ nltk>=3.4.5
 git+https://github.com/TREMA-UNH/trec-car-tools.git#subdirectory=python3
 sqlitedict>=1.6.0
 pytrec-eval-terrier>=0.5.1
-gensim>=3.7.3
 Cython>=0.29.2
 pyjnius>=1.2.1
 ir_datasets>=0.2.0
@@ -34,3 +33,6 @@ ir_measures>=0.2.1
 # misc
 pytools>=2018.5.2
 cached-property>=1.5.1
+
+# optional:
+# gensim>=3.7.3
