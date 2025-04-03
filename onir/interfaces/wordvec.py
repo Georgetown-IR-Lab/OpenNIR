@@ -103,16 +103,17 @@ def convknrm_handler(base_url):
 
 
 def gensim_w2v_handler(url):
-    try:
-        from gensim.models.keyedvectors import KeyedVectors
-    except ImportError as ie:
-        raise "gensim needs to be installed for this to work" from ie
     def wrapped(logger):
         with tempfile.TemporaryDirectory() as p:
             vocab_path = os.path.join(p, 'vocab')
             with logger.duration(f'downloading {url}'):
                 util.download(url, vocab_path)
             with logger.duration(f'loading binary {vocab_path}'):
+                try:
+                    from gensim.models.keyedvectors import KeyedVectors
+                except ModuleNotFoundError as mnfe:
+                    print("gensim needs to be installed for gensim_w2v_handler to work") 
+                    raise mnfe
                 vectors = KeyedVectors.load_word2vec_format(vocab_path, binary=True)
             vocab_path += '.txt'
             with logger.duration(f'saving text {vocab_path}'):
