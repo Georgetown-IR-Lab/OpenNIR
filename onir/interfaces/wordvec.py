@@ -2,7 +2,6 @@ import os
 import tempfile
 import zipfile
 import numpy as np
-from gensim.models.keyedvectors import KeyedVectors
 from onir import util
 from onir.interfaces import plaintext
 
@@ -104,6 +103,10 @@ def convknrm_handler(base_url):
 
 
 def gensim_w2v_handler(url):
+    try:
+        from gensim.models.keyedvectors import KeyedVectors
+    except E:
+        raise "gensim needs to be installed for this to work" from E
     def wrapped(logger):
         with tempfile.TemporaryDirectory() as p:
             vocab_path = os.path.join(p, 'vocab')
