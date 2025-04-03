@@ -522,6 +522,8 @@ class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
 
 
 def _inject(cls, context={}):
+    if not hasattr(inspect, 'getargspec'):
+        inspect.getargspec = inspect.getfullargspec
     spec = inspect.getargspec(cls.__init__)
     args = []
     for arg in spec.args:
