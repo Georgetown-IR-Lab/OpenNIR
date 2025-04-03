@@ -2,7 +2,6 @@ import os
 import tempfile
 import zipfile
 import numpy as np
-from gensim.models.keyedvectors import KeyedVectors
 from onir import util
 from onir.interfaces import plaintext
 
@@ -110,6 +109,11 @@ def gensim_w2v_handler(url):
             with logger.duration(f'downloading {url}'):
                 util.download(url, vocab_path)
             with logger.duration(f'loading binary {vocab_path}'):
+                try:
+                    from gensim.models.keyedvectors import KeyedVectors
+                except ModuleNotFoundError as mnfe:
+                    print("gensim needs to be installed for gensim_w2v_handler to work") 
+                    raise mnfe
                 vectors = KeyedVectors.load_word2vec_format(vocab_path, binary=True)
             vocab_path += '.txt'
             with logger.duration(f'saving text {vocab_path}'):
