@@ -105,8 +105,8 @@ def convknrm_handler(base_url):
 def gensim_w2v_handler(url):
     try:
         from gensim.models.keyedvectors import KeyedVectors
-    except E:
-        raise "gensim needs to be installed for this to work" from E
+    except ImportError as ie:
+        raise "gensim needs to be installed for this to work" from ie
     def wrapped(logger):
         with tempfile.TemporaryDirectory() as p:
             vocab_path = os.path.join(p, 'vocab')
