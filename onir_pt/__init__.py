@@ -35,7 +35,7 @@ class PtValidator:
     def validate(self):
         with _logger.duration('validation'):
             res = self.pt_transformer.transform(self.va_run)
-            metrics = pyterrier.Utils.evaluate(res, self.va_qrels, metrics=self.config['va_metrics'])
+            metrics = pyterrier.Evaluate(res, self.va_qrels, metrics=self.config['va_metrics'])
             primary_metric = metrics[self.config['va_metrics'][0]]
             return primary_metric, metrics
 
@@ -208,7 +208,7 @@ class PtTopicQrelsTrainer(PtPairTrainerBase):
 
 
 
-class OpenNIRPyterrierReRanker(pyterrier.transformer.EstimatorBase):
+class OpenNIRPyterrierReRanker(pyterrier.Estimator):
     """
     Provides an interface for OpenNIR-style ranking models to act
     as re-rankers in pyterrier pipelines.
